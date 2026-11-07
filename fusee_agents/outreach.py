@@ -23,6 +23,16 @@ from . import db, mailbox
 from .config import PUBLIC_URL
 
 DAILY_LIMIT = int(os.getenv("OUTREACH_DAILY_LIMIT", "20"))
+EMAIL_LIMITS = (10, 20, 30, 50)  # choix dans 🔐 Autorisations
+
+
+def daily_limit() -> int:
+    """E-mails de prospection par jour, pour TOUTE l'équipe (réglé avec le code parent, sinon .env)."""
+    try:
+        v = int(db.get_setting("outreach_daily_limit", "0") or 0)
+    except ValueError:
+        v = 0
+    return v if v in EMAIL_LIMITS else DAILY_LIMIT
 FOLLOWUP_DAYS = 5
 EMAIL_RE = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
 STOP_RE = re.compile(r"\b(stop|désinscri|desinscri|unsubscribe|ne (plus|pas) (me )?(contacter|écrire|ecrire)|"
@@ -120,7 +130,7 @@ def send(prospect: dict, subject: str, message: str, agent: str, followup: bool 
         raise ValueError(f"prospect « {prospect['status']} » : on ne le relance plus")
     if prospect["sends"] >= (2 if followup else 1):
         raise ValueError("déjà contacté (1 e-mail + 1 relance maximum)")
-    limit = min(camp["daily_limit"] or DAILY_LIMIT, DAILY_LIMIT)
+    limit = min(camp["daily_limit"] or daily_limit(), daily_limit())
     if sent_today() >= limit:
         raise ValueError(f"plafond du jour atteint ({limit} e-mails) : reprends demain")
     if mailbox.ENABLED and not business_hours():

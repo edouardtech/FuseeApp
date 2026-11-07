@@ -1068,7 +1068,7 @@ async def execute(agent: str, name: str, args: dict, wake) -> str:
         return json.dumps(rows, ensure_ascii=False) or "Calendrier vide."
     # --- prospection d'entreprises -----------------------------------------
     if name == "create_campaign":
-        limit = max(1, min(int(args["daily_limit"] or 10), outreach.DAILY_LIMIT))
+        limit = max(1, min(int(args["daily_limit"] or 10), outreach.daily_limit()))
         cid = db.x("INSERT INTO campaigns (ts, agent, name, product_id, target, offer, sender_name, example, followup, "
                    "daily_limit) VALUES (?,?,?,?,?,?,?,?,?,?)",
                    (time.time(), agent, args["name"], args["product_id"] or None, args["target"], args["offer"],
@@ -1127,7 +1127,7 @@ async def execute(agent: str, name: str, args: dict, wake) -> str:
                       "LIMIT 40", (c["id"],))
             out.append({"campagne": c["id"], "nom": c["name"], "statut": c["status"], "par_jour": c["daily_limit"],
                         "stats": outreach.stats(c["id"]), "prospects": ps})
-        return json.dumps({"envoyes_aujourdhui": outreach.sent_today(), "plafond_jour": outreach.DAILY_LIMIT,
+        return json.dumps({"envoyes_aujourdhui": outreach.sent_today(), "plafond_jour": outreach.daily_limit(),
                            "campagnes": out}, ensure_ascii=False) if out else "Aucune campagne."
     # --- YouTube --------------------------------------------------------------
     if name == "youtube_search":

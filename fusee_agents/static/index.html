@@ -187,8 +187,8 @@ nav#bottom{display:none}
     <div id="msgs"></div>
     <div id="meetBar" hidden></div>
     <div id="fChips" class="chips" hidden></div>
-    <form class="send" id="f"><div class="ctools"><button type="button" id="fClip" title="Envoyer une image ou un fichier">📎</button><button type="button" id="fMic" title="Parler au lieu d'écrire">🎤</button><input type="file" id="fFile" multiple hidden></div><textarea id="txt" rows="2" placeholder="Écris au groupe… (@Neo pour un agent) — ou 🎙️ Réunion : toute l'équipe te répond en même temps"></textarea>
-      <div style="display:flex;flex-direction:column;gap:6px"><button class="primary">Envoyer</button><button type="button" id="meetBtn" class="meet" title="Tous les agents répondent en même temps, en quelques secondes">🎙️ Réunion</button></div></form>
+    <form class="send" id="f"><div class="ctools"><button type="button" id="fClip" title="Envoyer une image ou un fichier">📎</button><button type="button" id="fMic" title="Parler au lieu d'écrire">🎤</button><input type="file" id="fFile" multiple hidden></div><textarea id="txt" rows="2" placeholder="Écris au groupe… (@Neo pour un agent) — ou 🎙️ Conseil : le Grand Conseil te répond (@Tous pour tout le monde)"></textarea>
+      <div style="display:flex;flex-direction:column;gap:6px"><button class="primary">Envoyer</button><button type="button" id="meetBtn" class="meet" title="Le Grand Conseil (Vice, Garde, les 4 mini-boss) répond en même temps. Écris @Tous pour réunir toute l'équipe.">🎙️ Conseil</button></div></form>
   </section>
   <aside id="side">
     <div class="tabs" id="tabs"></div>
@@ -314,7 +314,7 @@ function attHtml(att) {
   return f || l ? `<div class="att">${f}${l}</div>` : "";
 }
 
-const TEAM_ORDER = ["🎖️ Direction", "💼 Business", "📣 Marketing", "🧑‍💻 Création", "🗓️ Organisation", "🔀 Coordination"];
+const TEAM_ORDER = ["🎖️ Direction", "💼 Business", "📣 Marketing", "🧑‍💻 Création", "📧 E-mails", "🗓️ Organisation"];
 function renderAgents() {
   const ordered = [...S.agents].sort((x, y) => {
     const ix = TEAM_ORDER.indexOf(x.team), iy = TEAM_ORDER.indexOf(y.team);
@@ -895,7 +895,10 @@ async function renderPermBox() {
       ${p.active ? `<div style="margin-top:4px">🟢 <b>Délégation active en ce moment.</b></div>` : ""}</div>
     ${ck("pmPub", p.publish, "🌐 Mettre des sites en ligne", "Annulable : le site est retiré d'internet.")}
     ${ck("pmBiz", p.business, "🚀 Lancer un business sans argent")}
-    ${ck("pmOut", p.outreach, "📧 Contacter des entreprises (prospection)", "⚠️ Un e-mail envoyé ne peut pas être repris. Toujours 20 par jour au maximum, entreprises seulement.")}
+    ${ck("pmOut", p.outreach, "📧 Contacter des entreprises (prospection)", "⚠️ Un e-mail envoyé ne peut pas être repris. Entreprises seulement.")}
+    <div style="margin:4px 0 6px 26px;color:var(--text)">📧 E-mails par jour pour toute l'équipe :
+      <select id="pmMails">${[10, 20, 30, 50].map(n => `<option value="${n}" ${p.emails_per_day === n ? "selected" : ""}>${n}</option>`).join("")}</select>
+      <div class="muted">Au-delà de 20 par jour, le risque que tes e-mails arrivent en spam augmente.</div></div>
     <div style="margin:8px 0 2px;color:var(--text)"><b>Quand ?</b></div>
     <label style="display:flex;gap:8px;color:var(--text)"><input type="radio" name="pmWhen" value="solo" ${p.always ? "" : "checked"}> Seulement quand je les laisse travailler seuls (bouton 💤)</label>
     <label style="display:flex;gap:8px;color:var(--text)"><input type="radio" name="pmWhen" value="always" ${p.always ? "checked" : ""}> Tout le temps</label>
@@ -907,7 +910,8 @@ async function renderPermBox() {
     ${p.parent_set ? "" : `<div class="muted" style="margin-top:6px">👉 Il faut d'abord un code parent (carte 👪 ci-dessous).</div>`}`;
   $("#pmSave").onclick = async () => {
     const r = await post("/api/permissions", {pin: $("#pmPin").value, publish: $("#pmPub").checked, business: $("#pmBiz").checked,
-      outreach: $("#pmOut").checked, always: (document.querySelector('input[name="pmWhen"]:checked') || {}).value === "always", unlimited: $("#pmUnl").checked});
+      outreach: $("#pmOut").checked, always: (document.querySelector('input[name="pmWhen"]:checked') || {}).value === "always", unlimited: $("#pmUnl").checked,
+      emails_per_day: +$("#pmMails").value});
     const j = await r.json().catch(() => ({}));
     if (r.ok) { renderPermBox(); poll(); } else $("#pmMsg2").textContent = j.detail || "Erreur";
   };

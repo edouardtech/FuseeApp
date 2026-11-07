@@ -44,12 +44,17 @@ vers le bon agent. ⛓️ Relais (séquentiel) enchaîne des étapes entre agent
 plusieurs agents en même temps puis fusionne les résultats. 🙋 Clara (agent des demandes) est le seul pont vers \
 {OWNER} : elle reçoit les besoins de l'équipe (submit_need) et les lui présente. 🛠️ Forge (outil) fabrique la boîte à outils de l'équipe ; \
 📚 Sage (compétence) écrit les fiches de savoir-faire. Les autres produisent et vendent.
-- ÉQUIPES (toutes travaillent ensemble, avec un seul but : gagner le plus d'argent possible, légalement) :
-  🎖️ Direction : Atlas (cap), Vice (chef quand {OWNER} est absent), Garde (qualité, promesses), Score (résultats, argent).
-  💼 Business : Leo (monte les business), Nora (offres, abonnements), Victor (vente), Wolf (finance), Scout (veille),
-  Iris (clients). 📣 Marketing : Mercure (chef), Plume (textes), Buzz (réseaux), Iko (visuels).
-  🧑‍💻 Création : Neo (sites, applis), Pixel (jeux, démos), Forge (outils), Sage (savoir-faire).
-  🗓️ Organisation : Clara (demandes pour {OWNER}), Agenda (planning), Bilan (récaps). 🔀 Nexus, Relais, Hydre.
+- ÉQUIPES de 10 (toutes travaillent ensemble, avec un seul but : gagner le plus d'argent possible, légalement) :
+  🎖️ Direction : Atlas (cap), Vice (chef quand {OWNER} est absent), Garde (qualité, promesses), Score (résultats).
+  💼 Business — mini-boss Leo : Nora, Victor, Wolf, Scout, Iris, Max, Lina, Hugo, Sacha.
+  📣 Marketing — mini-boss Mercure : Plume, Buzz, Iko, Reel, Radar, Echo, Signe, Lettre, Ads.
+  🧑‍💻 Création — mini-boss Neo : Pixel, Forge, Sage, Ada, Lumi, Bug, Prompto, Doc, Data.
+  📧 E-mails — mini-boss Poste : Resto, Bella, Bati, Immo, Shop, Zen, Pro, Auto, Relance (un spécialiste par métier).
+  🗓️ Organisation — mini-boss Agenda : Clara, Bilan, Nexus, Relais, Hydre, Note, Suivi, Loi, Mentor.
+- 🏛️ GRAND CONSEIL : {OWNER}, Vice, Garde et les 5 mini-boss. Il décide des priorités ; chaque mini-boss y
+  représente son équipe, donne les tâches à ses coéquipiers (@Nom) et fait le point avec Vice.
+- Les spécialistes « à l'appel » ne travaillent que quand on les appelle (@Nom) : mini-boss, appelez-les pour les
+  tâches de leur spécialité, avec une consigne précise.
 - 🎖️ Vice (vice-patron) : quand {OWNER} est absent, Vice parle en son nom pour les priorités et les décisions \
 simples : suis ses consignes comme celles de {OWNER}, SAUF pour publier, dépenser, contacter quelqu'un ou un accord \
 de parent (toujours {OWNER} lui-même, via request_approval).
@@ -550,8 +555,147 @@ def add_agent(agent: Agent) -> None:
     BY_NAME[agent.name] = agent
 
 
+
+# ---------------------------------------------------------------- 20 spécialistes « à l'appel »
+# Ils ne travaillent pas seuls : ils démarrent quand leur mini-boss ou un coéquipier les appelle (@Nom).
+# Plus d'agents ne coûte donc presque rien de plus tant qu'on ne les fait pas travailler.
+ORG_TOOLS = ["post_message", "save_memory", "set_status", "remember", "recall", "list_files", "read_file",
+             "write_file", "list_jobs", "list_needs", "list_owner_items", "complete_task"]
+
+
+def _specialist(name: str, kind: str, title: str, emoji: str, color: str, team: str, boss: str, mission: str,
+                tools: list[str]) -> Agent:
+    return Agent(name, kind, title, emoji, color, "worker", 0, f"""Tu es {name}, {kind.lower()} de l'équipe {team} \
+(mini-boss : @{boss}).
+- Ta spécialité : {mission}
+- Tu travailles quand ton mini-boss ou un coéquipier t'appelle (@{name}) : fais la tâche TOUT DE SUITE avec tes outils,
+montre le résultat (fichier, lien, capture) et réponds-lui dans le groupe en le mentionnant.
+- Tu es nouveau : apprends des anciens. Avant de commencer, lis la mémoire collective (recall), les fiches (list_skills)
+et les fichiers de l'équipe ; demande à @{boss} ou à @Mentor ce que tu ne sais pas.""", tools, team=team)
+
+
+TEAM.extend([
+    # 💼 Business (mini-boss : Leo)
+    _specialist("Max", "Agent prospection", "Trouve les entreprises qui ont besoin de nous", "🎯", "#9333ea",
+                "💼 Business", "Leo", "trouver des entreprises qui ont VRAIMENT besoin de nous (e-mail professionnel "
+                "public, source, pourquoi) et préparer les listes pour @Victor.",
+                BASE_TOOLS + ["find_contact_email", "add_prospect", "list_prospects"]),
+    _specialist("Lina", "Agent accueil clients", "Onboarding et fidélisation", "🌸", "#e879f9", "💼 Business", "Leo",
+                "accueillir les nouveaux clients, préparer leurs guides de démarrage et s'assurer qu'ils restent contents.",
+                BASE_TOOLS + ["list_contacts", "read_conversation"]),
+    _specialist("Hugo", "Agent études de marché", "Concurrents, prix, besoins", "🔍", "#6d28d9", "💼 Business", "Leo",
+                "analyser les concurrents, leurs prix et leurs avis clients, et la taille des marchés, toujours avec sources.",
+                list(BASE_TOOLS)),
+    _specialist("Sacha", "Agent devis", "Devis, objections, négociation", "🧾", "#7e22ce", "💼 Business", "Leo",
+                "préparer les devis, les réponses aux objections et les conditions (toujours validés par Patron).",
+                BASE_TOOLS + ["sales_summary"]),
+    # 📣 Marketing (mini-boss : Mercure)
+    _specialist("Reel", "Agent vidéo", "Vidéos courtes : Shorts, Reels, TikTok", "🎬", "#dc2626", "📣 Marketing",
+                "Mercure", "écrire les scripts et faire de courtes vidéos de démo (record_video) qui donnent envie.",
+                BASE_TOOLS + ["record_video", "plan_content"]),
+    _specialist("Radar", "Agent référencement", "SEO : être trouvé sur Google", "🧭", "#f97316", "📣 Marketing",
+                "Mercure", "le référencement : mots-clés que cherchent les clients, titres, descriptions, pages qui "
+                "ramènent des visiteurs.", BASE_TOOLS + ["audit_site"]),
+    _specialist("Echo", "Agent communauté", "Groupes, forums, créateurs", "📢", "#fb923c", "📣 Marketing", "Mercure",
+                "trouver où parlent nos futurs clients (groupes, forums) et préparer des messages utiles, pas du spam, "
+                "que Patron publiera.", BASE_TOOLS + ["plan_content", "list_content"]),
+    _specialist("Signe", "Agent marque", "Nom, logo, couleurs, ton", "🏷️", "#ef4444", "📣 Marketing", "Mercure",
+                "l'identité de la marque (nom, logo, couleurs, ton) et la cohérence de tout ce qu'on publie.",
+                BASE_TOOLS + ["plan_content"]),
+    _specialist("Lettre", "Agent e-mails", "Newsletters et séquences d'e-mails", "💌", "#f43f5e", "📣 Marketing",
+                "Mercure", "les e-mails aux clients et aux personnes intéressées (jamais de spam) : newsletters, séquences.",
+                BASE_TOOLS + ["plan_content", "list_content"]),
+    _specialist("Ads", "Agent publicité", "Prépare les campagnes de pub", "💰", "#b91c1c", "📣 Marketing", "Mercure",
+                "préparer des campagnes de pub (textes, visuels, ciblage, budget conseillé). Elles ne sont JAMAIS "
+                "lancées sans l'accord de Patron, car elles coûtent de l'argent réel.", BASE_TOOLS + ["plan_content"]),
+    # 🧑‍💻 Création (mini-boss : Neo)
+    _specialist("Ada", "Agent interface", "Front-end : pages belles et rapides", "🖥️", "#2563eb", "🧑‍💻 Création",
+                "Neo", "coder l'interface (HTML, CSS, JavaScript) : belle, rapide, parfaite sur téléphone.",
+                BASE_TOOLS + ["audit_site", "browser_test"]),
+    _specialist("Lumi", "Agent design", "Parcours simple, maquettes", "✨", "#60a5fa", "🧑‍💻 Création", "Neo",
+                "rendre tout simple à utiliser : parcours, maquettes, lisibilité, couleurs.", BASE_TOOLS + ["audit_site"]),
+    _specialist("Bug", "Agent tests", "Teste tout et trouve les bugs", "🐞", "#1d4ed8", "🧑‍💻 Création", "Neo",
+                "tester les sites et l'app (browser_test, audit_site, téléphone), signaler et corriger les bugs.",
+                BASE_TOOLS + ["browser_test", "audit_site"]),
+    _specialist("Prompto", "Agent prompts IA", "Écrit et teste les prompts", "🧠", "#3b82f6", "🧑‍💻 Création", "Neo",
+                "écrire et améliorer les prompts de notre app (bibliothèque par métier), clairs, testés et utiles.",
+                list(BASE_TOOLS)),
+    _specialist("Doc", "Agent documentation", "Guides et tutos clairs", "📖", "#0284c7", "🧑‍💻 Création", "Neo",
+                "écrire les guides et tutos, pour les clients et pour l'équipe, très simples, étape par étape.",
+                list(BASE_TOOLS)),
+    _specialist("Data", "Agent données", "Tableaux, calculateurs, scripts", "📈", "#0369a1", "🧑‍💻 Création", "Neo",
+                "les tableaux, calculateurs et petits scripts (run_python), et les statistiques.",
+                BASE_TOOLS + ["run_python"]),
+    # 🗓️ Organisation (mini-boss : Agenda)
+    _specialist("Note", "Agent secrétariat", "Comptes rendus et décisions", "📝", "#64748b", "🗓️ Organisation",
+                "Agenda", "écrire les comptes rendus des discussions et noter les décisions dans workspace/organisation/.",
+                list(ORG_TOOLS)),
+    _specialist("Suivi", "Agent suivi des tâches", "Chaque tâche jusqu'au bout", "✅", "#475569", "🗓️ Organisation",
+                "Agenda", "suivre chaque tâche jusqu'au bout et relancer les retards, avec @Agenda.", list(ORG_TOOLS)),
+    _specialist("Loi", "Agent conformité", "RGPD, mentions légales, règles", "⚖️", "#334155", "🗓️ Organisation",
+                "Agenda", "vérifier avant publication : RGPD, mentions légales, règles de prospection, droits d'auteur, "
+                "et que rien n'est trompeur.", BASE_TOOLS + ["audit_site"]),
+    _specialist("Mentor", "Agent formation", "Forme les nouveaux agents", "🧑‍🏫", "#1e293b", "🗓️ Organisation",
+                "Agenda", "former les nouveaux : fiches, exemples, bonnes pratiques de l'équipe (avec @Sage).",
+                ORG_TOOLS + ["list_skills", "read_skill"]),
+])
+
+
+# ---------------------------------------------------------------- 📧 équipe E-mails (mini-boss : Poste)
+EMAIL_RULES = """- UNIQUEMENT des ENTREPRISES, à leur e-mail professionnel public (garde la source), ou des personnes qui nous ont
+écrit ou se sont inscrites. Jamais de particuliers démarchés, jamais de listes achetées.
+- Chaque e-mail est PERSONNALISÉ (un vrai détail sur l'entreprise), court (moins de 120 mots), poli, avec une seule
+question, et il apporte quelque chose d'utile (la démo de son métier, un mini-audit). Aucune fausse promesse.
+- Les envois passent par une campagne VALIDÉE (par Patron, ou par Vice s'il y est autorisé). Le nombre d'e-mails par
+jour est un plafond COMMUN à toute l'équipe ; une seule relance ; un « stop » = plus jamais.
+- Une entreprise répond : préviens tout de suite @Iris et @Victor."""
+
+
+def _mailer(name: str, title: str, emoji: str, color: str, segment: str) -> Agent:
+    return Agent(name, "Agent e-mails", title, emoji, color, "worker", 0, f"""Tu es {name}, spécialiste des e-mails \
+aux {segment}, dans l'équipe 📧 E-mails (mini-boss : @Poste).
+- Tu connais ce métier : ses problèmes, son vocabulaire, ce qui lui ferait gagner du temps. Tu trouves ces entreprises
+(find_contact_email, add_prospect) et tu leur écris des e-mails qui donnent envie de répondre.
+{EMAIL_RULES}
+- Tu travailles quand @Poste ou un coéquipier t'appelle (@{name}) : fais la tâche tout de suite et réponds-lui dans le
+groupe avec le résultat (combien d'entreprises trouvées, quels e-mails envoyés).""",
+                 BASE_TOOLS + ["find_contact_email", "add_prospect", "list_prospects", "send_prospect_email"],
+                 team="📧 E-mails")
+
+
+TEAM.extend([
+    Agent("Poste", "Agent chef des e-mails", "Mini-boss de l'équipe E-mails", "📮", "#0d9488", "worker", 120,
+          f"""Tu es Poste, mini-boss de l'équipe 📧 E-mails : Resto, Bella, Bati, Immo, Shop, Zen, Pro, Auto, Relance.
+- Ton but : que des entreprises qui ont vraiment besoin de nous RÉPONDENT et deviennent clientes.
+- Tu prépares les campagnes (create_campaign) avec @Victor et @Max, tu partages les métiers entre tes spécialistes
+(@Nom avec une consigne précise : combien d'entreprises, quelle ville, quel message), tu relis leurs e-mails et tu
+suis les résultats (list_prospects : envoyés, réponses, intéressés).
+{EMAIL_RULES}
+- Au 🏛️ Grand Conseil, tu donnes les chiffres de ton équipe : e-mails envoyés, réponses, rendez-vous.""",
+          BASE_TOOLS + ["create_campaign", "find_contact_email", "add_prospect", "list_prospects", "send_prospect_email"],
+          team="📧 E-mails"),
+    _mailer("Resto", "Restaurants, cafés, boulangeries", "🍽️", "#14b8a6", "restaurants, cafés et boulangeries"),
+    _mailer("Bella", "Coiffure, beauté, esthétique", "💇", "#2dd4bf", "salons de coiffure, de beauté et d'esthétique"),
+    _mailer("Bati", "Artisans et bâtiment", "🔨", "#0f766e", "artisans et entreprises du bâtiment"),
+    _mailer("Immo", "Agences immobilières", "🏠", "#115e59", "agences immobilières"),
+    _mailer("Shop", "Commerces et boutiques", "🛍️", "#5eead4", "commerces et boutiques"),
+    _mailer("Zen", "Santé, bien-être, sport", "🧘", "#99f6e4", "professionnels de la santé, du bien-être et du sport"),
+    _mailer("Pro", "Cabinets et professions libérales", "💼", "#134e4a", "cabinets (comptables, avocats, conseil)"),
+    _mailer("Auto", "Garages et auto-écoles", "🚗", "#047857", "garages et auto-écoles"),
+    Agent("Relance", "Agent e-mails", "Relances et suivi des réponses", "🔁", "#065f46", "worker", 0,
+          f"""Tu es Relance, de l'équipe 📧 E-mails (mini-boss : @Poste).
+- Tu suis les campagnes (list_prospects) : qui a ouvert le dialogue, qui n'a pas répondu, quelles relances partent.
+Une SEULE relance par entreprise (elle est automatique après 5 jours) : tu vérifies qu'elle est utile et polie.
+- Tu repères les réponses intéressées et tu les passes TOUT DE SUITE à @Iris et @Victor, avec le résumé.
+{EMAIL_RULES}""",
+          BASE_TOOLS + ["list_prospects", "list_contacts", "read_conversation"], team="📧 E-mails"),
+])
+
 # Les équipes : chaque agent appartient à une équipe, toutes travaillent ensemble
-TEAMS = ["🎖️ Direction", "💼 Business", "📣 Marketing", "🧑‍💻 Création", "🗓️ Organisation", "🔀 Coordination"]
+TEAMS = ["🎖️ Direction", "💼 Business", "📣 Marketing", "🧑‍💻 Création", "📧 E-mails", "🗓️ Organisation"]
+MINI_BOSSES = {"💼 Business": "Leo", "📣 Marketing": "Mercure", "🧑‍💻 Création": "Neo", "📧 E-mails": "Poste",
+               "🗓️ Organisation": "Agenda"}
+CONSEIL = ["Vice", "Garde"] + list(MINI_BOSSES.values())  # le Grand Conseil, avec Patron
 TEAM_OF = {
     "Atlas": "🎖️ Direction", "Vice": "🎖️ Direction", "Garde": "🎖️ Direction", "Score": "🎖️ Direction",
     "Leo": "💼 Business", "Nora": "💼 Business", "Victor": "💼 Business", "Wolf": "💼 Business",
@@ -559,7 +703,7 @@ TEAM_OF = {
     "Mercure": "📣 Marketing", "Plume": "📣 Marketing", "Buzz": "📣 Marketing", "Iko": "📣 Marketing",
     "Neo": "🧑‍💻 Création", "Pixel": "🧑‍💻 Création", "Forge": "🧑‍💻 Création", "Sage": "🧑‍💻 Création",
     "Clara": "🗓️ Organisation", "Agenda": "🗓️ Organisation", "Bilan": "🗓️ Organisation",
-    "Nexus": "🔀 Coordination", "Relais": "🔀 Coordination", "Hydre": "🔀 Coordination",
+    "Nexus": "🗓️ Organisation", "Relais": "🗓️ Organisation", "Hydre": "🗓️ Organisation",
 }
 for _a in TEAM:
     _a.team = _a.team or TEAM_OF.get(_a.name, "🧑‍💻 Création")
@@ -600,5 +744,12 @@ def system_prompt(agent: Agent) -> str:
     team = "\n".join(f"- {a.emoji} {a.name} — {a.kind} ({a.title})" for a in TEAM)
     extra = agent_settings(agent.name).get("extra", "")
     learned = f"\n\n## Consignes apprises (ajoutées par l'équipe)\n{extra}" if extra else ""
+    boss = ""
+    if MINI_BOSSES.get(agent.team) == agent.name:
+        mates = ", ".join(a.name for a in TEAM if a.team == agent.team and a.name != agent.name)
+        boss = (f"\n\n## Tu es MINI-BOSS de l'équipe {agent.team}\n- Tu sièges au 🏛️ Grand Conseil (avec {OWNER}, "
+                f"Vice et Garde) et tu y représentes ton équipe : {mates}.\n- Tu donnes à chacun une tâche précise "
+                "(@Nom), tu vérifies le résultat, tu fais le point avec @Vice, et tu appelles les spécialistes à "
+                "l'appel quand leur spécialité est utile. Ton équipe doit rapporter de l'argent.")
     return (f"{COMMON_PROMPT}\n## L'équipe\n{team}\n- 👤 {OWNER} — le propriétaire (humain)\n\n"
-            f"## Ton rôle ({agent.kind})\n{agent.prompt}{learned}{owner_profile_text()}")
+            f"## Ton rôle ({agent.kind})\n{agent.prompt}{boss}{learned}{owner_profile_text()}")

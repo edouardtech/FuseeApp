@@ -1038,3 +1038,36 @@ def test_agents_talk_to_each_other_when_the_owner_is_away():
     budget.stop_work()
     db.set_setting("owner_available", "1")
     assert "PARLEZ ENTRE VOUS" not in runner.build_context(BY_NAME["Neo"], "message de Patron : salut")
+
+
+def test_teams_of_ten_mini_bosses_and_grand_conseil(monkeypatch):
+    from collections import Counter
+    from fastapi.testclient import TestClient
+    from fusee_agents import outreach, parent, web
+    from fusee_agents.agents import CONSEIL, MINI_BOSSES
+    sizes = Counter(a.team for a in TEAM)
+    assert all(n >= 10 for team, n in sizes.items() if team != "🎖️ Direction") and len(TEAM) == 54
+    for old in ("Atlas", "Vice", "Neo", "Leo", "Mercure", "Clara", "Iris", "Wolf", "Pixel", "Nexus"):
+        assert old in BY_NAME  # les anciens sont toujours là
+    assert set(MINI_BOSSES.values()) <= set(CONSEIL) and {"Vice", "Garde"} <= set(CONSEIL)
+    assert "Tu es MINI-BOSS" in system_prompt(BY_NAME["Poste"]) and "Tu es MINI-BOSS" not in system_prompt(BY_NAME["Resto"])
+    assert BY_NAME["Resto"].interval_min == 0 and "send_prospect_email" in BY_NAME["Resto"].tools  # à l'appel
+    # 🎙️ sans mention : le Grand Conseil répond (pas les 54)
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test")
+    got = []
+
+    async def fake_meeting(agents, text, wake):
+        got.extend(a.name for a in agents)
+    monkeypatch.setattr(web.runner, "run_meeting", fake_meeting)
+    c = TestClient(web.app)
+    assert c.post("/api/meeting", json={"content": "Point du jour"}).status_code == 200
+    assert sorted(got) == sorted(CONSEIL)
+    # e-mails par jour : réglables avec le code parent
+    for k in ("parent_pin_hash", "parent_salt", "parent_name"):
+        db.set_setting(k, "")
+    parent._fails.clear()
+    parent.setup("Muriel", "1593")
+    assert c.post("/api/permissions", json={"pin": "1593", "emails_per_day": 35}).status_code == 400
+    assert c.post("/api/permissions", json={"pin": "1593", "emails_per_day": 30}).json()["emails_per_day"] == 30
+    assert outreach.daily_limit() == 30
+    db.set_setting("outreach_daily_limit", "0")

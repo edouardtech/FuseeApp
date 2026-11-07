@@ -448,8 +448,11 @@ async def meeting(msg: Msg):
     if budget.api_exhausted() or budget.owner_exhausted():
         raise HTTPException(400, "Même la rallonge du jour est utilisée : la réunion reprendra demain (ou augmente le "
                                  "budget dans 💰 Argent).")
+    from .agents import CONSEIL
     named = [n for n in mentions(text) if n in BY_NAME]
-    pool = [BY_NAME[n] for n in named] if named and len(named) < len(BY_NAME) else list(TEAM)
+    if not named:  # sans mention : le 🏛️ Grand Conseil (Vice, Garde, mini-boss) ; @Tous pour toute l'équipe
+        named = [n for n in CONSEIL if n in BY_NAME]
+    pool = [BY_NAME[n] for n in named]
     agents = [a for a in pool if agent_settings(a.name).get("enabled", True) is not False]
     mid = db.post_message(OWNER, f"🎙️ {text}")
     budget.note_owner_active()
@@ -711,7 +714,8 @@ async def decide(aid: int, d: Decision):
 
 @app.get("/api/permissions")
 def permissions_state():
-    return {**delegation.settings(), "parent_set": parent.is_set(), "active": delegation.active()}
+    return {**delegation.settings(), "parent_set": parent.is_set(), "active": delegation.active(),
+            "emails_per_day": outreach.daily_limit()}
 
 
 class Permissions(BaseModel):
@@ -721,6 +725,7 @@ class Permissions(BaseModel):
     outreach: bool = False
     always: bool = False
     unlimited: bool = False
+    emails_per_day: int | None = None  # 10, 20, 30 ou 50 e-mails de prospection par jour (toute l'équipe)
 
 
 @app.post("/api/permissions")
@@ -732,6 +737,10 @@ def permissions_save(p: Permissions):
         raise HTTPException(403, "Trop d'essais : réessaie dans 15 minutes." if parent.locked() else "Code incorrect.")
     s = delegation.save(publish=p.publish, business=p.business, outreach=p.outreach, always=p.always,
                         unlimited=p.unlimited)
+    if p.emails_per_day is not None:
+        if p.emails_per_day not in outreach.EMAIL_LIMITS:
+            raise HTTPException(400, "Choisis 10, 20, 30 ou 50 e-mails par jour.")
+        db.set_setting("outreach_daily_limit", str(p.emails_per_day))
     allowed = [delegation.LABELS[k] for k in ("publish", "business", "outreach") if s[k]]
     db.post_message("Fusée", "🔐 Autorisations mises à jour : "
                     + (f"🎖️ Vice peut, à la place de {OWNER} ({'tout le temps' if s['always'] else 'pendant le travail en solo'}) : "
@@ -1146,7 +1155,7 @@ def outreach_api():
         c["stats"] = outreach.stats(c["id"])
         c["prospects"] = db.q("SELECT * FROM prospects WHERE campaign_id=? ORDER BY (status='à envoyer par Patron') DESC, "
                               "id DESC LIMIT 200", (c["id"],))
-    return {"campaigns": camps, "sent_today": outreach.sent_today(), "daily_limit": outreach.DAILY_LIMIT,
+    return {"campaigns": camps, "sent_today": outreach.sent_today(), "daily_limit": outreach.daily_limit(),
             "mail_enabled": mailbox.ENABLED, "suppressed": db.q("SELECT COUNT(*) n FROM suppression")[0]["n"]}
 
 

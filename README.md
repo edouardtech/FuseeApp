@@ -300,21 +300,22 @@ prépare un **kit** (`prepare_itch_kit`) : le ZIP prêt pour itch.io, une couver
 textes et les étapes ; il te demande ton accord, puis **c'est toi qui publies** en 5 minutes. Jeu payant : les
 paiements doivent être au nom d'un parent.
 
-## 👥 Les équipes (24 agents)
+## 👥 Les équipes (54 agents) et le 🏛️ Grand Conseil
 
 Toutes les équipes travaillent ensemble, avec un seul but : **gagner le plus d'argent possible, légalement**.
 
-- **🎖️ Direction** : Atlas (cap), Vice (chef quand tu es absent), **Garde** (vérifie que le travail est fait et
-  bien fait, tient les promesses à l'œil), **Score** (suit l'argent : ce qui rapporte, ce qui coûte).
-- **💼 Business** : **Leo** (monte des business rentables de A à Z), **Nora** (offres, abonnements, partenariats),
-  Victor, Wolf, Scout, Iris.
-- **📣 Marketing** : Mercure (chef), **Plume** (textes), **Buzz** (réseaux sociaux, calendrier), **Iko** (visuels).
-- **🧑‍💻 Création** : Neo, Pixel, Forge, Sage.
-- **🗓️ Organisation** : Clara (tes demandes), **Agenda** (le planning de l'équipe), **Bilan** (les récaps des
-  demandes ; il te fait le récap quand tu repasses à 🟢).
-- **🔀 Coordination** : Nexus, Relais, Hydre.
+- **🎖️ Direction** : Atlas (cap), Vice (chef quand tu es absent), Garde (qualité, promesses), Score (résultats).
+- **💼 Business** — mini-boss **Leo** : Nora, Victor, Wolf, Scout, Iris, Max, Lina, Hugo, Sacha.
+- **📣 Marketing** — mini-boss **Mercure** : Plume, Buzz, Iko, Reel, Radar, Echo, Signe, Lettre, Ads.
+- **🧑‍💻 Création** — mini-boss **Neo** : Pixel, Forge, Sage, Ada, Lumi, Bug, Prompto, Doc, Data.
+- **📧 E-mails** — mini-boss **Poste** : Resto, Bella, Bati, Immo, Shop, Zen, Pro, Auto (un spécialiste par métier
+  d'entreprise) et Relance. Ils n'écrivent qu'à des entreprises (ou à des gens qui nous ont écrit), avec une campagne
+  validée ; le nombre d'e-mails par jour (10, 20, 30 ou 50) est commun à toute l'équipe (🔐 Autorisations).
+- **🗓️ Organisation** — mini-boss **Agenda** : Clara, Bilan, Nexus, Relais, Hydre, Note, Suivi, Loi, Mentor.
 
-Plus d'agents = plus de travail, mais aussi plus de dépenses quand ils travaillent seuls (💸 Dépenses de l'IA).
+**🏛️ Grand Conseil** : toi, Vice, Garde et les 5 mini-boss. Le bouton **🎙️ Conseil** les réunit (écris **@Tous**
+pour réunir toute l'équipe). Les 30 spécialistes ajoutés récemment sont « à l'appel » : ils ne travaillent que quand un
+mini-boss ou un coéquipier les appelle (@Nom), donc ils ne coûtent rien quand ils ne servent pas.
 
 ## ⚡ Rythme quand ils travaillent seuls
 
