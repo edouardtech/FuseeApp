@@ -560,7 +560,7 @@ class Availability(BaseModel):
 
 
 @app.post("/api/availability")
-def set_availability(a: Availability):
+async def set_availability(a: Availability):  # async : le briefing de secours est une tâche de la boucle
     """🟢 Je suis là / 🔴 Pas disponible : absent, rien ne t'est envoyé ; de retour, tout t'est présenté d'un coup."""
     was = budget.owner_available()
     db.set_setting("owner_available", "1" if a.available else "0")
@@ -572,6 +572,7 @@ def set_availability(a: Availability):
         if "Bilan" in BY_NAME:
             scheduler.wake("Bilan", f"{OWNER} a dit qu'il est de retour : fais-lui MAINTENANT le récap des demandes "
                                     "(write_report « 📋 Récap des demandes » + 5 lignes dans le groupe)")
+        scheduler.briefing()  # 📋 le briefing tout de suite (Fusée publie le classement si Atlas n'a pas le temps)
         notify("retour", "📥 Ce qui t'attend", f"{n_appr} validation(s), {n_q} question(s), {n_t} tâche(s) dans 📥 Demandes.")
     elif not a.available and was:
         db.post_message(OWNER, "🔴 Je ne suis pas disponible : ne m'envoyez rien, gardez vos demandes pour mon retour. "

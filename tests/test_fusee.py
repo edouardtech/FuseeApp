@@ -985,6 +985,7 @@ def test_new_teams_and_agents():
     web.scheduler.reasons["Bilan"].clear()
     c.post("/api/availability", json={"available": True})
     assert any("récap des demandes" in r for r in web.scheduler.reasons["Bilan"])
+    assert any("BRIEFING" in r for r in web.scheduler.reasons["Atlas"])  # et le briefing, tout de suite
 
 
 def test_pace_rapide_and_turbo(monkeypatch):
