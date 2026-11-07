@@ -14,7 +14,7 @@
 :root{--bg:#0b0b1a;--bg2:#12122a;--panel:rgba(22,22,48,.78);--panel2:rgba(34,34,70,.72);--line:rgba(140,140,255,.16);--text:#eef0ff;--muted:#a3a8c8;
   --accent:#8b5cf6;--accent2:#ec4899;--accent3:#f97316;--ok:#22c55e;--bad:#f43f5e;--warn:#f59e0b;--me:linear-gradient(135deg,#7c3aed,#db2777);
   --glow1:rgba(139,92,246,.30);--glow2:rgba(236,72,153,.22);--glow3:rgba(14,165,233,.20);--shadow:0 8px 30px rgba(0,0,0,.35)}
-:root[data-theme="light"]{--bg:#f6f4ff;--bg2:#fff;--panel:rgba(255,255,255,.85);--panel2:rgba(246,243,255,.95);--line:rgba(110,80,200,.16);--text:#1d1b3a;--muted:#6b6890;
+:root[data-theme="light"]{--strong:#7c2d12;--bg:#f6f4ff;--bg2:#fff;--panel:rgba(255,255,255,.85);--panel2:rgba(246,243,255,.95);--line:rgba(110,80,200,.16);--text:#1d1b3a;--muted:#6b6890;
   --glow1:rgba(139,92,246,.18);--glow2:rgba(236,72,153,.14);--glow3:rgba(14,165,233,.14);--shadow:0 6px 24px rgba(80,60,160,.12)}
 *{box-sizing:border-box}
 html,body{height:100%}
@@ -65,6 +65,11 @@ aside,section{min-height:0;overflow:auto}
 .lnk{display:inline-block;background:linear-gradient(135deg,rgba(139,92,246,.22),rgba(236,72,153,.18));border:1px solid rgba(167,139,250,.45);border-radius:10px;
   padding:3px 9px;font-size:12px;text-decoration:none;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 form.send{display:flex;gap:8px;padding:12px;border-top:1px solid var(--line);background:var(--panel)}
+.md b{color:var(--strong,#fde68a);font-weight:800}.msg.me .md b,.msg.me.md b{color:#fff}
+.md mark{background:linear-gradient(90deg,#fde047,#fb923c);color:#1e1b4b;border-radius:6px;padding:0 5px;font-weight:700}
+.md .li{display:block;padding-left:14px;position:relative}.md .li:before{content:"•";position:absolute;left:2px;color:var(--ag,#a78bfa);font-weight:900}
+.md .ln-ok{display:block;color:#4ade80}.md .ln-ko{display:block;color:#f87171}.md .ln-todo{display:block;color:#fbbf24;font-weight:700}.md .ln-wip{display:block;color:#facc15}
+.md b.at{color:inherit}
 .team-head{font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin:12px 4px 4px}
 .ctools{display:flex;flex-direction:column;gap:6px}.ctools button{padding:6px 9px;font-size:17px;line-height:1}
 .ctools button.rec{background:#ef4444!important;color:#fff;border-color:#ef4444;animation:recp 1s infinite}
@@ -213,10 +218,13 @@ const mdTable = block => {
 };
 const md = s => esc(s).replace(/(?:^\|.*\|[ \t]*(?:\n|$))+/gm, mdTable)
   .replace(/^### (.*)$/gm,"<h3>$1</h3>").replace(/^## (.*)$/gm,"<h2>$1</h2>").replace(/^# (.*)$/gm,"<h1>$1</h1>")
-  .replace(/\*\*(.+?)\*\*/g,"<b>$1</b>").replace(/(^|[^*])\*([^*\n]+)\*/g,"$1<i>$2</i>").replace(/`([^`]+)`/g,"<code>$1</code>")
+  .replace(/==(.+?)==/g,"<mark>$1</mark>").replace(/\*\*(.+?)\*\*/g,"<b>$1</b>").replace(/(^|[^*])\*([^*\n]+)\*/g,"$1<i>$2</i>").replace(/`([^`]+)`/g,"<code>$1</code>")
   .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g,'<a href="$2" target="_blank" rel="noopener">$1</a>')
   .replace(/(^|[\s(])(https?:\/\/[^\s<)]+)/g,'$1<a href="$2" target="_blank" rel="noopener">$2</a>')
-  .replace(/^---$/gm,"<hr>").replace(/(<\/h[123]>|<\/table>|<hr>)\n+/g,"$1").replace(/\n/g,"<br>");
+  .replace(/^[-•] (.*)$/gm,'<span class="li">$1</span>')
+  .replace(/^(✅.*)$/gm,'<span class="ln-ok">$1</span>').replace(/^(❌.*|⚠️.*)$/gm,'<span class="ln-ko">$1</span>')
+  .replace(/^(👉.*)$/gm,'<span class="ln-todo">$1</span>').replace(/^(🟡.*)$/gm,'<span class="ln-wip">$1</span>')
+  .replace(/^---$/gm,"<hr>").replace(/(<\/span>)\n/g,"$1").replace(/(<\/h[123]>|<\/table>|<hr>)\n+/g,"$1").replace(/\n/g,"<br>");
 const api = (u, opt) => fetch(u, opt).then(r => r.json());
 const post = (u, body) => fetch(u, {method:"POST", headers:{"Content-Type":"application/json"}, body: body ? JSON.stringify(body) : undefined});
 const wpath = p => "/w/" + p.split("/").map(encodeURIComponent).join("/");
@@ -368,7 +376,7 @@ function addMessages(list) {
     lastId = Math.max(lastId, m.id);
     if (meet && m.id > meet.since && meet.agents.includes(m.sender)) meet.done.add(m.sender);
     const me = m.sender === "Patron";
-    box.insertAdjacentHTML("beforeend", `<div class="msg ${me?"me":""}" style="--ag:${colorOf(m.sender)}"><div class="who">${emojiOf(m.sender)} ${esc(m.sender)}</div>${esc(m.content).replace(/(^|\s)@(\w+)/g,"$1<b>@$2</b>")}${attHtml(m.attachments)}<div class="t">${time(m.ts)}</div></div>`);
+    box.insertAdjacentHTML("beforeend", `<div class="msg md ${me?"me":""}" style="--ag:${colorOf(m.sender)}"><div class="who">${emojiOf(m.sender)} ${esc(m.sender)}</div>${md(m.content).replace(/(^|[\s>(])@(\w+)/g,'$1<b class="at">@$2</b>')}${attHtml(m.attachments)}<div class="t">${time(m.ts)}</div></div>`);
   }
   if (list.length && stick) box.scrollTop = box.scrollHeight;
   updateMeet();
@@ -434,7 +442,7 @@ async function renderPane(soft) {
         if (dmSpeak && dmSeen[a.name] !== undefined && lastIn.id > dmSeen[a.name]) speak(lastIn.content);
         dmSeen[a.name] = lastIn.id;
       } else if (dmSeen[a.name] === undefined) dmSeen[a.name] = 0;
-      const thread = dm.messages.map(m => `<div class="bub ${m.sender === "Patron" ? "out" : "in"}">${esc(m.content)}${attHtml(m.attachments)}<br><span class="muted">${time(m.ts)}</span></div>`).join("")
+      const thread = dm.messages.map(m => `<div class="bub md ${m.sender === "Patron" ? "out" : "in"}">${md(m.content)}${attHtml(m.attachments)}<br><span class="muted">${time(m.ts)}</span></div>`).join("")
         + (dm.typing ? `<div class="bub in muted">${a.emoji} ${a.name} écrit…</div>` : "");
       const input = pane.querySelector("#dmInput");
       if (soft && input && (input.value || document.activeElement === input)) {  // ne pas effacer ce que tu tapes
