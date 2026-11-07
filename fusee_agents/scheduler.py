@@ -13,6 +13,8 @@ from .runner import run_cycle
 OWNER_WAKES = (f"message de {OWNER}", f"{OWNER} a ", f"en privé, {OWNER}", "pendant la réunion", "la clé API vient",
                "message du parent")
 IDLE = ("cycle régulier", "démarrage")
+# L'organisateur quand Patron est absent : il garde la priorité sur le budget (jusqu'à la rallonge du jour)
+PRIORITY_AGENTS = {"Vice"}
 
 
 def why_may_work(name: str, reason: str) -> str | None:
@@ -76,6 +78,8 @@ class Scheduler:
                 db.set_state(name, status="en pause (décision de l'équipe)")
             elif not self.paused:
                 why = why_may_work(name, reason)
+                if why == "autonome" and name in PRIORITY_AGENTS:
+                    why = "priorité"  # Vice continue d'organiser même quand les autres s'arrêtent pour le budget
                 if why is None or (why == "autonome" and budget.autonomous_budget_used()):
                     if reason not in IDLE:
                         self.deferred[name] = (self.deferred[name] + [reason])[-5:]
@@ -87,7 +91,7 @@ class Scheduler:
                         self.deferred[name] = []
                     await self._acquire(name)
                     try:
-                        await run_cycle(agent, reason, self.wake, for_owner=why in ("patron", "client"))
+                        await run_cycle(agent, reason, self.wake, for_owner=why in ("patron", "client", "priorité"))
                     finally:
                         self.running.discard(name)
             # attendre le prochain cycle (ou une mention), avec un délai minimum anti ping-pong

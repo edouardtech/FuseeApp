@@ -280,11 +280,11 @@ async def run_cycle(agent: Agent, reason: str, wake, for_owner: bool = False) ->
         db.set_state(agent.name, status="en attente de la clé API (onglet 🚀 Démarrage)")
         return
     if budget.api_exhausted():
-        db.set_state(agent.name, status="budget IA épuisé")
+        db.set_state(agent.name, status="💶 budget IA total épuisé (💰 Argent → augmente « Dont IA »)")
         return
     if limit_hit():
         db.set_state(agent.name, status="rallonge du jour utilisée : reprend demain" if for_owner
-                     else "budget du jour atteint")
+                     else "budget du jour atteint (🔐 « Sans limite par jour » pour continuer)")
         return
     model, effort = model_for(agent.tier)
     db.set_state(agent.name, status="travaille", last_run=time.time())

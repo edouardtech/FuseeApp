@@ -389,6 +389,12 @@ async function poll() {
     if (!selected) selected = r.agents[0]?.name;
     $("#model").textContent = "plan " + r.plan;
     $("#cost").innerHTML = `${r.budget.remaining_eur.toFixed(0)} €<span class="hide-mi"> · IA ${r.budget.api_today_eur.toFixed(2)}/${r.budget.unlimited ? "∞" : r.budget.api_daily_cap_eur.toFixed(2) + " €"}</span>`;
+    let bb = $("#budgetBanner");
+    if (!bb) { bb = document.createElement("div"); bb.id = "budgetBanner"; bb.style.cssText = "background:#7f1d1d;color:#fff;padding:8px 14px;font-weight:700;cursor:pointer"; document.querySelector("header").after(bb); bb.onclick = () => { location.hash = "#money"; }; }
+    bb.hidden = !(r.budget.total_exhausted || (r.budget.today_exhausted && !r.budget.unlimited));
+    bb.innerHTML = r.budget.total_exhausted
+      ? `💶 Le budget IA TOTAL (« Dont IA ») est épuisé : ${r.budget.api_spent_eur.toFixed(2)} € sur ${r.budget.api_budget_eur.toFixed(0)} €. « Sans limite par jour » ne suffit pas : touche ici → 💰 Argent → augmente « Dont IA » (pas plus que ton crédit sur la Claude Console).`
+      : `⏸️ Le budget du jour est atteint : ils reprendront demain. Pour continuer aujourd'hui : 🔐 Autorisations → « Sans limite par jour ».`;
     $("#costbar").style.width = Math.min(100, 100 * r.budget.api_today_eur / Math.max(r.budget.api_daily_cap_eur, 0.01)) + "%";
     $("#pauseBtn").innerHTML = r.paused ? "▶️<span class=lbl> Reprendre</span>" : "⏸️<span class=lbl> Pause</span>";
     $("#availBtn").innerHTML = r.available === false ? "🔴<span class=lbl> Pas disponible</span>" : "🟢<span class=lbl> Je suis là</span>";

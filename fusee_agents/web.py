@@ -153,8 +153,9 @@ def state(after: int = 0):
         "agents": agents,
         "messages": [_msg(m) for m in db.recent_messages(200, after)],
         "plan": PLAN,
-        "budget": {k: b[k] for k in ("remaining_eur", "initial_eur", "api_today_eur", "api_daily_cap_eur",
-                                     "api_spent_eur", "api_budget_eur", "unlimited")},
+        "budget": {**{k: b[k] for k in ("remaining_eur", "initial_eur", "api_today_eur", "api_daily_cap_eur",
+                                        "api_spent_eur", "api_budget_eur", "unlimited")},
+                   "total_exhausted": budget.api_exhausted(), "today_exhausted": budget.today_exhausted()},
         "open_questions": db.q("SELECT COUNT(*) n FROM owner_questions WHERE answer IS NULL")[0]["n"],
         "open_owner_tasks": db.q("SELECT COUNT(*) n FROM owner_tasks WHERE done=0")[0]["n"],
         "unread_dms": {r["agent"]: r["n"] for r in db.q(
@@ -742,6 +743,8 @@ def permissions_save(p: Permissions):
         if p.emails_per_day not in outreach.EMAIL_LIMITS:
             raise HTTPException(400, "Choisis 10, 20, 30 ou 50 e-mails par jour.")
         db.set_setting("outreach_daily_limit", str(p.emails_per_day))
+    if s["unlimited"]:
+        _restart_after_budget_change()
     allowed = [delegation.LABELS[k] for k in ("publish", "business", "outreach") if s[k]]
     db.post_message("Fusée", "🔐 Autorisations mises à jour : "
                     + (f"🎖️ Vice peut, à la place de {OWNER} ({'tout le temps' if s['always'] else 'pendant le travail en solo'}) : "
@@ -1026,6 +1029,16 @@ class BudgetSettings(BaseModel):
     api_days: float
 
 
+def _restart_after_budget_change() -> None:
+    """Le budget vient d'être augmenté : on efface les vieux « budget atteint » et l'équipe repart tout de suite."""
+    for name, st in db.get_states().items():
+        s = (st.get("status") or "")
+        if "budget" in s or "rallonge" in s:
+            db.set_state(name, status="en attente")
+    if budget.work_authorized() and not budget.api_exhausted():
+        scheduler._kick()
+
+
 @app.post("/api/budget/settings")
 def budget_settings(b: BudgetSettings):
     if b.initial_eur < 0 or b.api_budget_eur < 0 or b.api_days < 1 or b.api_budget_eur > b.initial_eur:
@@ -1035,6 +1048,7 @@ def budget_settings(b: BudgetSettings):
     db.set_setting("api_days", str(b.api_days))
     db.post_message(OWNER, f"💰 Budget mis à jour : {b.initial_eur:.0f} € au total, dont {b.api_budget_eur:.0f} € "
                            f"pour l'IA sur {b.api_days:.0f} jours.")
+    _restart_after_budget_change()
     return {"ok": True}
 
 

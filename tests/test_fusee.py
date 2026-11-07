@@ -454,7 +454,7 @@ def test_owner_can_still_talk_after_the_daily_budget(monkeypatch):
     monkeypatch.setattr(runner, "client", NS(beta=NS(messages=NS(create=fake))))
     monkeypatch.setattr(db, "cost_today", lambda: 1.5 * cap)  # budget du jour dépassé, rallonge pas encore finie
     asyncio.run(runner.run_cycle(BY_NAME["Neo"], "cycle régulier", lambda *a: None))
-    assert not calls and db.get_states()["Neo"]["status"] == "budget du jour atteint"
+    assert not calls and db.get_states()["Neo"]["status"].startswith("budget du jour atteint")
     asyncio.run(runner.run_cycle(BY_NAME["Neo"], "message de Patron : tu es là ?", lambda *a: None, for_owner=True))
     assert len(calls) == 1 and "RALLONGE" in calls[0]
     assert TestClient(web.app).post("/api/dm/Neo", json={"content": "Salut"}).status_code == 200
@@ -1072,3 +1072,48 @@ def test_teams_of_ten_mini_bosses_and_grand_conseil(monkeypatch):
     assert c.post("/api/permissions", json={"pin": "1593", "emails_per_day": 30}).json()["emails_per_day"] == 30
     assert outreach.daily_limit() == 30
     db.set_setting("outreach_daily_limit", "0")
+
+
+def test_vice_keeps_priority_on_the_budget(monkeypatch):
+    import asyncio as aio
+    from fusee_agents import scheduler as sc
+    ran = []
+
+    async def fake(agent, reason, wake, for_owner=False):
+        ran.append((agent.name, for_owner))
+    monkeypatch.setattr(sc, "run_cycle", fake)
+    monkeypatch.setattr(budget, "autonomous_budget_used", lambda: True)  # les autres doivent s'arrêter
+    db.set_setting("owner_active_until", "0")
+    budget.authorize_work(time.time() + 3600)
+    s = sc.Scheduler()
+    for n in ("Vice", "Neo"):
+        BY_NAME[n].min_gap_s = 0
+
+    async def run():
+        tasks = [aio.create_task(s._loop(n, 0)) for n in ("Vice", "Neo")]
+        await aio.sleep(0.3)
+        for t in tasks:
+            t.cancel()
+    aio.run(run())
+    assert ("Vice", True) in ran and not any(n == "Neo" for n, _ in ran)
+    assert db.get_states()["Neo"]["status"].startswith("⏸️")
+    for n in ("Vice", "Neo"):
+        BY_NAME[n].min_gap_s = 60
+    budget.stop_work()
+
+
+def test_raising_the_budget_restarts_the_team(monkeypatch):
+    from fastapi.testclient import TestClient
+    from fusee_agents import web
+    db.set_state("Neo", status="budget du jour atteint (🔐 « Sans limite par jour » pour continuer)")
+    db.set_state("Leo", status="💶 budget IA total épuisé (💰 Argent → augmente « Dont IA »)")
+    budget.authorize_work(time.time() + 3600)
+    web.scheduler.reasons["Neo"].clear()
+    c = TestClient(web.app)
+    assert c.post("/api/budget/settings", json={"initial_eur": 100, "api_budget_eur": 40, "api_days": 30}).status_code == 200
+    st = db.get_states()
+    assert st["Neo"]["status"] == "en attente" and st["Leo"]["status"] == "en attente"
+    assert any(r.startswith("autorisation") for r in web.scheduler.reasons["Neo"])  # repartent tout de suite
+    s = c.get("/api/state").json()["budget"]
+    assert "total_exhausted" in s and "today_exhausted" in s
+    budget.stop_work()
