@@ -6,8 +6,10 @@ besoin d'un parent et il peut écrire à l'équipe en son nom (badge 👪). Le c
 """
 import hashlib
 import hmac
+import re
 import secrets
 import time
+import unicodedata
 
 from . import db
 
@@ -16,8 +18,30 @@ LOCK_S = 15 * 60         # …avant un blocage de 15 minutes
 _fails: list[float] = []
 
 
+def clean(pin) -> str:
+    """Le code tel qu'il est vraiment : sans espaces ni points ajoutés par le clavier (iPhone), chiffres normaux."""
+    return re.sub(r"[\s.\-]", "", unicodedata.normalize("NFKC", str(pin or "")))
+
+
 def _hash(pin: str, salt: str) -> str:
-    return hashlib.pbkdf2_hmac("sha256", pin.encode(), salt.encode(), 200_000).hex()
+    return hashlib.pbkdf2_hmac("sha256", clean(pin).encode(), salt.encode(), 200_000).hex()
+
+
+def _matches(pin: str) -> bool:
+    return hmac.compare_digest(_hash(pin, db.get_setting("parent_salt", "")), db.get_setting("parent_pin_hash", ""))
+
+
+def appears_in(text: str) -> bool:
+    """Le code parent a-t-il été tapé dans un message (groupe, privé) ? Il ne doit jamais y être. Ne compte pas comme
+    un essai raté (sert seulement à protéger le code)."""
+    if not is_set():
+        return False
+    tokens = set(re.findall(r"(?<!\d)\d[\d\s.\-]{2,20}\d(?!\d)", unicodedata.normalize("NFKC", text or "")))
+    for token in list(tokens)[:12]:  # chaque vérification prend un peu de temps : on se limite
+        digits = clean(token)
+        if digits.isdigit() and 4 <= len(digits) <= 12 and _matches(digits):
+            return True
+    return False
 
 
 def is_set() -> bool:
@@ -38,8 +62,7 @@ def check(pin: str) -> bool:
     """Le code est-il le bon ? Après 5 erreurs, plus aucun essai pendant 15 minutes."""
     if not is_set() or locked():
         return False
-    ok = hmac.compare_digest(_hash(str(pin or ""), db.get_setting("parent_salt", "")),
-                             db.get_setting("parent_pin_hash", ""))
+    ok = _matches(pin)
     if not ok:
         _fails.append(time.time())
     return ok
@@ -48,7 +71,7 @@ def check(pin: str) -> bool:
 def setup(parent_name: str, pin: str, old_pin: str = "") -> None:
     """Crée le code parent, ou le change (il faut alors l'ancien code)."""
     parent_name = parent_name.strip()[:40]
-    pin = str(pin).strip()
+    pin = clean(pin)
     if not parent_name:
         raise ValueError("Écris le prénom du parent.")
     if not (pin.isdigit() and 4 <= len(pin) <= 12):

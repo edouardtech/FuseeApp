@@ -420,6 +420,11 @@ def send(msg: Msg):
     text, files = msg.content.strip(), _owner_files(msg.attachments)
     if not text and not files:
         raise HTTPException(400, "message vide")
+    if parent.appears_in(text):
+        raise HTTPException(400, "🔐 Ne mets jamais le code parent dans un message : les agents ne peuvent pas le "
+                                 "vérifier, et tout le monde le verrait. Il se tape seulement dans ✅ Validations (sous "
+                                 "une demande 👪), dans 🔐 Autorisations, ou dans ⚙️ Réglages → 👪 « écrit à l'équipe ». "
+                                 "Ton message n'a pas été envoyé.")
     text = text or "📎 Regardez ce que je vous envoie."
     db.post_message(OWNER, text, json.dumps({"files": files, "links": []}) if files else "")
     targets = mentions(text) or ["Nexus"]  # sans mention, le routeur aiguille la demande
@@ -434,6 +439,9 @@ async def meeting(msg: Msg):
     text = msg.content.strip()
     if not text:
         raise HTTPException(400, "message vide")
+    if parent.appears_in(text):
+        raise HTTPException(400, "🔐 Ne mets jamais le code parent dans un message : il se tape seulement dans ✅ "
+                                 "Validations, 🔐 Autorisations ou ⚙️ Réglages → 👪. Ton message n'a pas été envoyé.")
     if not (os.getenv("ANTHROPIC_API_KEY") or os.getenv("ANTHROPIC_AUTH_TOKEN")):
         raise HTTPException(400, "Il faut d'abord la clé API (onglet 🚀 Démarrage).")
     if budget.api_exhausted() or budget.owner_exhausted():
@@ -769,6 +777,9 @@ def parent_message(m: ParentMsg):
         raise HTTPException(400, "message vide")
     if not parent.check(m.pin):
         raise HTTPException(403, "Trop d'essais : réessaie dans 15 minutes." if parent.locked() else "Code parent incorrect.")
+    if parent.appears_in(text):
+        raise HTTPException(400, "🔐 Le code parent ne doit pas être écrit dans le message lui-même (seulement dans la "
+                                 "case « Code parent »). Message pas envoyé.")
     db.post_message(parent.sender(), text)
     targets = mentions(text) or ["Atlas"]
     for t in targets:
@@ -1139,6 +1150,11 @@ async def dm_send(agent: str, msg: Msg):
     text, files = msg.content.strip(), _owner_files(msg.attachments)
     if not text and not files:
         raise HTTPException(400, "message vide")
+    if parent.appears_in(text):
+        raise HTTPException(400, "🔐 Ne mets jamais le code parent dans un message : les agents ne peuvent pas le "
+                                 "vérifier, et tout le monde le verrait. Il se tape seulement dans ✅ Validations (sous "
+                                 "une demande 👪), dans 🔐 Autorisations, ou dans ⚙️ Réglages → 👪 « écrit à l'équipe ». "
+                                 "Ton message n'a pas été envoyé.")
     text = text or "📎 Regarde ce que je t'envoie."
     if not (os.getenv("ANTHROPIC_API_KEY") or os.getenv("ANTHROPIC_AUTH_TOKEN")):
         raise HTTPException(400, "Il faut d'abord la clé API (onglet 🚀 Démarrage).")

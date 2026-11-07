@@ -855,3 +855,25 @@ def test_unlimited_means_work_fully_but_keep_a_small_reserve(monkeypatch):
     assert not budget.owner_exhausted() and not budget.api_exhausted()  # mais Patron peut encore leur parler
     delegation.save(unlimited=False)
     budget.stop_work()
+
+
+def test_parent_code_tolerates_keyboard_spaces_and_never_goes_in_the_chat():
+    from fastapi.testclient import TestClient
+    from fusee_agents import parent, web
+    for k in ("parent_pin_hash", "parent_salt", "parent_name"):
+        db.set_setting(k, "")
+    parent._fails.clear()
+    parent.setup("Muriel", "1357")
+    assert parent.check("1357 ") and parent.check(" 13 57") and parent.check("１３５７")  # espace, chiffres « larges »
+    assert not parent.check("1358")
+    parent._fails.clear()
+    c = TestClient(web.app)
+    n = db.q("SELECT COUNT(*) n FROM messages")[0]["n"]
+    for text in ("@Vice mon code parent c'est 1357", "code : 13 57 voilà"):
+        r = c.post("/api/message", json={"content": text})
+        assert r.status_code == 400 and "Ne mets jamais le code parent" in r.json()["detail"]
+    assert c.post("/api/dm/Vice", json={"content": "1357"}).status_code == 400
+    assert c.post("/api/meeting", json={"content": "le code est 1357"}).status_code == 400
+    assert db.q("SELECT COUNT(*) n FROM messages")[0]["n"] == n  # rien n'a été posté
+    assert c.post("/api/message", json={"content": "On vise 1000 clients en 2027 !"}).status_code == 200  # autres nombres : ok
+    assert not parent.locked()  # la protection ne compte pas comme des essais ratés
