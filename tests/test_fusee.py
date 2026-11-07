@@ -1026,3 +1026,15 @@ def test_changing_pace_wakes_the_team_right_away():
     assert any(r.startswith("autorisation") for r in web.scheduler.reasons["Atlas"])
     c.post("/api/work", json={"pace": "normal"})
     budget.stop_work()
+
+
+def test_agents_talk_to_each_other_when_the_owner_is_away():
+    from fusee_agents import runner
+    db.post_message("Leo", "@Neo tu peux me montrer la page d'accueil de l'app ?")
+    budget.authorize_work(time.time() + 3600)
+    ctx = runner.build_context(BY_NAME["Neo"], "cycle régulier")
+    assert "PARLEZ ENTRE VOUS" in ctx and "Leo : @Neo tu peux me montrer" in ctx
+    assert "Se parler entre vous" in system_prompt(BY_NAME["Neo"])
+    budget.stop_work()
+    db.set_setting("owner_available", "1")
+    assert "PARLEZ ENTRE VOUS" not in runner.build_context(BY_NAME["Neo"], "message de Patron : salut")

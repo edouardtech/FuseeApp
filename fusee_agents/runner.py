@@ -191,10 +191,17 @@ def build_context(agent: Agent, reason: str) -> str:
     else:
         money_txt = (f"Ce travail en solo s'arrête à {round(budget.autonomous_share() * 100)} % du budget du jour : le "
                      f"reste est gardé pour quand {OWNER} vous parle.")
+    talk = [m for m in db.recent_messages(60) if f"@{agent.name}" in (m["content"] or "")
+            and m["sender"] not in (agent.name, OWNER, "Fusée")][-6:]
+    talk_txt = ("\n".join(f"[{_fmt_ts(m['ts'])}] {m['sender']} : {m['content'][:300]}" for m in talk)
+                or "(personne ne t'a écrit récemment)")
+    alone = budget.work_authorized() or not budget.owner_available()
+    team_txt = (f"\n🗣️ {OWNER} n'est pas là : PARLEZ ENTRE VOUS. Tes messages vont à tes coéquipiers (@Nom), pas à "
+                f"{OWNER} ; ce qui est pour lui va à @Bilan ou @Clara." if alone else "")
     turbo_txt = ("\n🚀 MODE TURBO : l'équipe doit rester active en continu. À chaque cycle, du VRAI travail (outils) "
                  "et coordonne-toi dans le groupe (@Nom) : dis ce que tu as fait et ce que tu attends des autres. "
                  "Pas de bavardage vide." if budget.turbo_on() else "")
-    away_txt = turbo_txt + ("" if budget.owner_available() else
+    away_txt = team_txt + turbo_txt + ("" if budget.owner_available() else
                 f"\n🔴 {OWNER} N'EST PAS DISPONIBLE : ne lui envoie AUCUNE demande, question, tâche ni notification "
                 "(elles seraient gardées pour son retour, sans le prévenir). Avance sur tout ce qui ne dépend pas de lui ; "
                 "ce qui ne peut vraiment pas attendre : submit_need (Clara regroupera tout pour son retour). Vice décide "
@@ -253,6 +260,9 @@ Raison du réveil : {reason}
 
 ## Mission permanente : le meilleur business
 {briefing.MISSION}
+
+## Messages de tes coéquipiers pour toi (réponds-leur en les mentionnant)
+{talk_txt}
 
 ## Classement des idées (du meilleur au moins bon)
 {ideas_txt}
