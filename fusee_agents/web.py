@@ -143,7 +143,7 @@ def _msg(m: dict) -> dict:
 def state(after: int = 0):
     states = db.get_states()
     agents = [{"name": a.name, "kind": a.kind, "title": a.title, "emoji": a.emoji, "color": a.color,
-               "tier": a.tier, "model": model_for(a.tier)[0],
+               "tier": a.tier, "model": model_for(a.tier)[0], "team": a.team,
                "interval_min": agent_settings(a.name).get("interval_min", a.interval_min),
                "learned": agent_settings(a.name).get("extra", ""),
                **{k: v for k, v in states.get(a.name, {}).items() if k != "agent"}}
@@ -563,6 +563,9 @@ def set_availability(a: Availability):
         n_q = db.q("SELECT COUNT(*) n FROM owner_questions WHERE answer IS NULL")[0]["n"]
         n_t = db.q("SELECT COUNT(*) n FROM owner_tasks WHERE done=0")[0]["n"]
         db.post_message(OWNER, "🟢 Je suis de retour : vous pouvez m'envoyer vos demandes.")
+        if "Bilan" in BY_NAME:
+            scheduler.wake("Bilan", f"{OWNER} a dit qu'il est de retour : fais-lui MAINTENANT le récap des demandes "
+                                    "(write_report « 📋 Récap des demandes » + 5 lignes dans le groupe)")
         notify("retour", "📥 Ce qui t'attend", f"{n_appr} validation(s), {n_q} question(s), {n_t} tâche(s) dans 📥 Demandes.")
     elif not a.available and was:
         db.post_message(OWNER, "🔴 Je ne suis pas disponible : ne m'envoyez rien, gardez vos demandes pour mon retour. "

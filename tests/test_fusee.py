@@ -961,3 +961,27 @@ def test_owner_unavailable_holds_requests_until_return(monkeypatch):
     assert c.post("/api/availability", json={"available": True}).json() == {"available": True}
     assert sent and sent[-1] == "📥 Ce qui t'attend"  # au retour : tout d'un coup
     assert "N'EST PAS DISPONIBLE" not in runner.build_context(BY_NAME["Victor"], "test")
+
+
+def test_new_teams_and_agents():
+    from fastapi.testclient import TestClient
+    from fusee_agents import web
+    from fusee_agents.agents import TEAM_OF, TEAMS
+    from fusee_agents.tools import CLIENT_TOOLS, SERVER_TOOLS
+    for n in ("Garde", "Score", "Leo", "Nora", "Plume", "Buzz", "Iko", "Agenda", "Bilan"):
+        assert n in BY_NAME, n
+    for a in TEAM:
+        assert a.team in TEAMS, a.name
+        assert all(t in CLIENT_TOOLS or t in SERVER_TOOLS for t in a.tools), a.name
+        for forbidden in ("decide_approval",):  # seul Vice valide à la place de Patron
+            assert a.name == "Vice" or forbidden not in a.tools, a.name
+    assert set(TEAM_OF) <= set(BY_NAME)
+    st = TestClient(web.app).get("/api/state").json()
+    assert {a["team"] for a in st["agents"]} <= set(TEAMS)
+    assert "Garde (qualité, promesses)" in system_prompt(BY_NAME["Neo"])
+    # quand Patron revient, Bilan fait le récap des demandes
+    c = TestClient(web.app)
+    c.post("/api/availability", json={"available": False})
+    web.scheduler.reasons["Bilan"].clear()
+    c.post("/api/availability", json={"available": True})
+    assert any("récap des demandes" in r for r in web.scheduler.reasons["Bilan"])

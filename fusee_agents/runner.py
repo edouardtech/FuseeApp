@@ -212,7 +212,7 @@ Raison du réveil : {reason}
 
 ## Mode de travail
 {mode_txt}{away_txt}
-{"" if agent.name != "Vice" else chr(10) + "## Délégation de " + OWNER + chr(10) + delegation.context_text() + chr(10) + chr(10) + "## Promesses de l'équipe (24 h)" + chr(10) + promises_txt + chr(10)}
+{"" if agent.name != "Garde" else chr(10) + "## Promesses de l'équipe (24 h)" + chr(10) + promises_txt + chr(10)}{"" if agent.name != "Vice" else chr(10) + "## Délégation de " + OWNER + chr(10) + delegation.context_text() + chr(10) + chr(10) + "## Promesses de l'équipe (24 h)" + chr(10) + promises_txt + chr(10)}
 ## Consigne permanente de {OWNER}
 {owner_directive or DEFAULT_DIRECTIVE}
 

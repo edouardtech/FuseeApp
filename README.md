@@ -300,6 +300,22 @@ prépare un **kit** (`prepare_itch_kit`) : le ZIP prêt pour itch.io, une couver
 textes et les étapes ; il te demande ton accord, puis **c'est toi qui publies** en 5 minutes. Jeu payant : les
 paiements doivent être au nom d'un parent.
 
+## 👥 Les équipes (24 agents)
+
+Toutes les équipes travaillent ensemble, avec un seul but : **gagner le plus d'argent possible, légalement**.
+
+- **🎖️ Direction** : Atlas (cap), Vice (chef quand tu es absent), **Garde** (vérifie que le travail est fait et
+  bien fait, tient les promesses à l'œil), **Score** (suit l'argent : ce qui rapporte, ce qui coûte).
+- **💼 Business** : **Leo** (monte des business rentables de A à Z), **Nora** (offres, abonnements, partenariats),
+  Victor, Wolf, Scout, Iris.
+- **📣 Marketing** : Mercure (chef), **Plume** (textes), **Buzz** (réseaux sociaux, calendrier), **Iko** (visuels).
+- **🧑‍💻 Création** : Neo, Pixel, Forge, Sage.
+- **🗓️ Organisation** : Clara (tes demandes), **Agenda** (le planning de l'équipe), **Bilan** (les récaps des
+  demandes ; il te fait le récap quand tu repasses à 🟢).
+- **🔀 Coordination** : Nexus, Relais, Hydre.
+
+Plus d'agents = plus de travail, mais aussi plus de dépenses quand ils travaillent seuls (💸 Dépenses de l'IA).
+
 ## 🤝 Faire, pas promettre
 
 Les agents doivent faire ce que tu demandes **tout de suite**, et ne plus dire « je vais faire » sans le faire :

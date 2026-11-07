@@ -65,6 +65,7 @@ aside,section{min-height:0;overflow:auto}
 .lnk{display:inline-block;background:linear-gradient(135deg,rgba(139,92,246,.22),rgba(236,72,153,.18));border:1px solid rgba(167,139,250,.45);border-radius:10px;
   padding:3px 9px;font-size:12px;text-decoration:none;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 form.send{display:flex;gap:8px;padding:12px;border-top:1px solid var(--line);background:var(--panel)}
+.team-head{font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin:12px 4px 4px}
 .ctools{display:flex;flex-direction:column;gap:6px}.ctools button{padding:6px 9px;font-size:17px;line-height:1}
 .ctools button.rec{background:#ef4444!important;color:#fff;border-color:#ef4444;animation:recp 1s infinite}
 @keyframes recp{50%{box-shadow:0 0 0 6px rgba(239,68,68,.25)}}
@@ -310,10 +311,18 @@ function attHtml(att) {
   return f || l ? `<div class="att">${f}${l}</div>` : "";
 }
 
+const TEAM_ORDER = ["🎖️ Direction", "💼 Business", "📣 Marketing", "🧑‍💻 Création", "🗓️ Organisation", "🔀 Coordination"];
 function renderAgents() {
-  $("#agents").innerHTML = S.agents.map(a => {
+  const ordered = [...S.agents].sort((x, y) => {
+    const ix = TEAM_ORDER.indexOf(x.team), iy = TEAM_ORDER.indexOf(y.team);
+    return (ix < 0 ? 99 : ix) - (iy < 0 ? 99 : iy);
+  });
+  let lastTeam = null;
+  $("#agents").innerHTML = ordered.map(a => {
+    const head = a.team && a.team !== lastTeam ? `<div class="team-head">${esc(a.team)}</div>` : "";
+    lastTeam = a.team || lastTeam;
     const st = a.status || "en attente", cls = st === "travaille" ? "on" : st.startsWith("erreur") || st.startsWith("budget") ? "err" : "";
-    return `<div class="agent ${selected===a.name?"sel":""}" data-n="${a.name}" style="--ag:${a.color}">
+    return head + `<div class="agent ${selected===a.name?"sel":""}" data-n="${a.name}" style="--ag:${a.color}">
       <div class="av">${a.emoji}</div>
       <div style="min-width:0"><b>${a.name}${(S.unread_dms || {})[a.name] ? ` <span class="badge" title="Message privé">💬 ${S.unread_dms[a.name]}</span>` : ""}</b><small>${esc(a.kind)} · ${esc(a.title)}</small>
       <small><span class="tag">${a.model.replace("claude-","").replace(/-(\d)-(\d)$/," $1.$2")}</span> <span class="tag">${a.interval_min && S.work && S.work.authorized ? "seul : toutes les " + a.interval_min + " min" : "quand tu parles"}</span></small>
