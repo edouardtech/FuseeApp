@@ -893,6 +893,18 @@ def owner_items():
 
 class Answer(BaseModel):
     answer: str
+    parent_pin: str = ""  # facultatif : c'est le parent qui répond (vérifié avec son code)
+
+
+def _parent_ok(pin: str) -> bool:
+    """Code parent donné (facultatif) : il doit être bon. Renvoie True si c'est bien le parent qui répond."""
+    if not (pin or "").strip():
+        return False
+    if not parent.is_set():
+        raise HTTPException(403, "Le parent doit d'abord créer son code (⚙️ Réglages → 👪 Accord d'un parent).")
+    if not parent.check(pin):
+        raise HTTPException(403, "Trop d'essais : réessaie dans 15 minutes." if parent.locked() else "Code parent incorrect.")
+    return True
 
 
 @app.post("/api/questions/{qid}")
@@ -901,26 +913,41 @@ def answer_question(qid: int, a: Answer):
     if not rows or not a.answer.strip():
         raise HTTPException(400)
     qrow = rows[0]
-    db.x("UPDATE owner_questions SET answer=?, answered_ts=? WHERE id=?", (a.answer.strip()[:4000], time.time(), qid))
+    if parent.appears_in(a.answer):
+        raise HTTPException(400, "🔐 Le code parent se met dans la case « 👪 Code parent », pas dans la réponse.")
+    by_parent = _parent_ok(a.parent_pin)
+    answer = (f"[👪 {parent.name()}, parent — code vérifié] " if by_parent else "") + a.answer.strip()[:4000]
+    db.x("UPDATE owner_questions SET answer=?, answered_ts=? WHERE id=?", (answer, time.time(), qid))
     for n in json.loads(qrow.get("need_ids") or "[]"):
-        db.x("UPDATE needs SET status='résolu', result=?, resolved_ts=? WHERE id=?", (a.answer.strip()[:4000], time.time(), n))
-    db.post_message(OWNER, f"💬 Réponse à la question #{qid} ({qrow['question'][:120]}) : {a.answer.strip()}")
-    scheduler.wake(qrow["agent"], f"{OWNER} a répondu à ta question #{qid} « {qrow['question'][:200]} » : {a.answer[:1000]}")
-    return {"ok": True}
+        db.x("UPDATE needs SET status='résolu', result=?, resolved_ts=? WHERE id=?", (answer, time.time(), n))
+    db.post_message(parent.sender() if by_parent else OWNER,
+                    f"💬 Réponse à la question #{qid} ({qrow['question'][:120]}) : {a.answer.strip()}")
+    scheduler.wake(qrow["agent"], f"{OWNER} a répondu à ta question #{qid} « {qrow['question'][:200]} »"
+                                  + (f" — ✅ RÉPONSE DU PARENT ({parent.name()}) vérifiée avec son code" if by_parent else "")
+                                  + f" : {a.answer[:1000]}")
+    return {"ok": True, "by_parent": by_parent}
 
 
 @app.post("/api/owner_tasks/{tid}")
-def toggle_task(tid: int, done: bool):
+async def toggle_task(tid: int, done: bool, request: Request):
     rows = db.q("SELECT * FROM owner_tasks WHERE id=?", (tid,))
     if not rows:
         raise HTTPException(404)
+    try:
+        body = await request.json()
+    except ValueError:
+        body = {}
+    by_parent = done and _parent_ok((body or {}).get("parent_pin", ""))
     db.x("UPDATE owner_tasks SET done=?, done_ts=? WHERE id=?", (1 if done else 0, time.time() if done else None, tid))
     if done:
+        who = f"{parent.name()} (parent, code vérifié)" if by_parent else OWNER
         for n in json.loads(rows[0].get("need_ids") or "[]"):
-            db.x("UPDATE needs SET status='résolu', result='fait par Patron', resolved_ts=? WHERE id=?", (time.time(), n))
-        db.post_message(OWNER, f"✔️ Fait : {rows[0]['title']}")
-        scheduler.wake(rows[0]["agent"], f"{OWNER} a fait la tâche #{tid} « {rows[0]['title']} »")
-    return {"ok": True}
+            db.x("UPDATE needs SET status='résolu', result=?, resolved_ts=? WHERE id=?", (f"fait par {who}", time.time(), n))
+        db.post_message(parent.sender() if by_parent else OWNER, f"✔️ Fait : {rows[0]['title']}")
+        scheduler.wake(rows[0]["agent"], f"{OWNER} a fait la tâche #{tid} « {rows[0]['title']} »"
+                                         + (f" — ✅ FAIT PAR LE PARENT ({parent.name()}), vérifié avec son code"
+                                            if by_parent else ""))
+    return {"ok": True, "by_parent": by_parent}
 
 
 # --- workflows, boîte à outils, compétences ------------------------------------

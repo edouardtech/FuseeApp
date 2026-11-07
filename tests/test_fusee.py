@@ -877,3 +877,31 @@ def test_parent_code_tolerates_keyboard_spaces_and_never_goes_in_the_chat():
     assert db.q("SELECT COUNT(*) n FROM messages")[0]["n"] == n  # rien n'a été posté
     assert c.post("/api/message", json={"content": "On vise 1000 clients en 2027 !"}).status_code == 200  # autres nombres : ok
     assert not parent.locked()  # la protection ne compte pas comme des essais ratés
+
+
+def test_parent_answers_questions_and_tasks_with_the_code():
+    from fastapi.testclient import TestClient
+    from fusee_agents import parent, web
+    for k in ("parent_pin_hash", "parent_salt", "parent_name"):
+        db.set_setting(k, "")
+    parent._fails.clear()
+    parent.setup("Muriel", "4321")
+    c = TestClient(web.app)
+    qid = db.x("INSERT INTO owner_questions (ts, agent, question, context, options) VALUES (?,?,?,?,?)",
+               (time.time(), "Victor", "Muriel : acceptes-tu d'ouvrir le compte Stripe à ton nom ?", "", "[]"))
+    assert c.post(f"/api/questions/{qid}", json={"answer": "Oui", "parent_pin": "0000"}).status_code == 403
+    r = c.post(f"/api/questions/{qid}", json={"answer": "Oui, je l'ouvre ce soir", "parent_pin": "4321"}).json()
+    assert r["by_parent"] and db.q("SELECT answer FROM owner_questions WHERE id=?", (qid,))[0]["answer"].startswith("[👪 Muriel")
+    assert db.recent_messages(1)[0]["sender"] == "👪 Muriel (parent)"
+    assert any("RÉPONSE DU PARENT (Muriel) vérifiée" in x for x in web.scheduler.reasons["Victor"])
+    q2 = db.x("INSERT INTO owner_questions (ts, agent, question, context, options) VALUES (?,?,?,?,?)",
+              (time.time(), "Neo", "Quelle couleur ?", "", "[]"))
+    assert c.post(f"/api/questions/{q2}", json={"answer": "Bleu"}).json()["by_parent"] is False  # Patron seul : ok
+    tid = db.x("INSERT INTO owner_tasks (ts, agent, title, steps, priority) VALUES (?,?,?,?,?)",
+               (time.time(), "Clara", "Muriel : créer le compte Stripe", "1. …", "haute"))
+    assert c.post(f"/api/owner_tasks/{tid}?done=true", json={"parent_pin": "4321"}).json()["by_parent"]
+    assert any("FAIT PAR LE PARENT (Muriel)" in x for x in web.scheduler.reasons["Clara"])
+    t2 = db.x("INSERT INTO owner_tasks (ts, agent, title, steps, priority) VALUES (?,?,?,?,?)",
+              (time.time(), "Neo", "Regarder le site", "", "normale"))
+    assert c.post(f"/api/owner_tasks/{t2}?done=true").json() == {"ok": True, "by_parent": False}  # sans corps : ok
+    parent._fails.clear()

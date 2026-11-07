@@ -505,19 +505,26 @@ async function renderPane(soft) {
       const openQ = d.questions.filter(q => !q.answer), todo = d.tasks.filter(t => !t.done);
       const doneQ = d.questions.filter(q => q.answer), done = d.tasks.filter(t => t.done);
       const ag = n => S.agents.find(a => a.name === n) || {emoji: "👤", color: "#64748b", title: ""};
+      const forParent = txt => /muriel|parent|maman|m[èe]re|adulte|stripe|paypal|banque|compte|contrat|sign/i.test(txt || "");
+      const pinBox = (id, open) => open
+        ? `<input id="${id}" type="password" inputmode="numeric" autocomplete="off" placeholder="👪 Code parent (si c'est Muriel qui répond)" style="width:100%;margin:6px 0">`
+        : `<details style="margin-top:6px"><summary class="muted" style="cursor:pointer">👪 C'est Muriel qui répond ?</summary><input id="${id}" type="password" inputmode="numeric" autocomplete="off" placeholder="👪 Code parent" style="width:100%;margin:6px 0"></details>`;
       const groups = {};
       const push = (who, html) => (groups[who] = groups[who] || []).push(html);
-      d.approvals.forEach(a => push(a.agent, `<div class="req req-ok"><div class="req-kind">🛡️ Validation · ${esc(a.kind)}${a.amount_eur ? ` · 💶 ${a.amount_eur} €` : ""}</div>
+      d.approvals.forEach(a => push(a.agent, `<div class="req req-ok"><div class="req-kind">🛡️ Validation · ${esc(a.kind)}${a.amount_eur ? ` · 💶 ${a.amount_eur} €` : ""}${a.needs_parent ? " · 👪 accord d'un parent" : ""}</div>
           <b>${esc(a.title)}</b><div class="md" style="margin:6px 0">${md(a.details)}</div>${attHtml(a.attachments)}
           <input id="c${a.id}" placeholder="Commentaire (optionnel)" style="width:100%;margin:6px 0">
+          ${a.needs_parent ? `<input id="p${a.id}" type="password" inputmode="numeric" autocomplete="off" placeholder="👪 Code parent (c'est le parent qui le tape)" style="width:100%;margin:0 0 6px">` : ""}
           <button class="primary" onclick="decide(${a.id},true)">✅ Oui</button> <button onclick="decide(${a.id},false)">❌ Non</button></div>`));
       openQ.forEach(q => push(q.agent, `<div class="req req-q"><div class="req-kind">❓ Question${q.via && q.via !== q.agent ? ` · présentée par ${esc(q.via)}` : ""}</div>
           <b>${esc(q.question)}</b>${q.context ? `<div class="muted">${esc(q.context)}</div>` : ""}
           <div style="margin-top:6px">${q.options.map(o => `<button onclick='answerQ(${q.id}, ${JSON.stringify(o).replace(/'/g, "&#39;")})'>${esc(o)}</button> `).join("")}</div>
-          <div style="display:flex;gap:6px;margin-top:6px"><input id="qa${q.id}" placeholder="Ta réponse…" style="flex:1"><button class="primary" onclick="answerQ(${q.id})">Répondre</button></div></div>`));
+          <div style="display:flex;gap:6px;margin-top:6px"><input id="qa${q.id}" placeholder="Ta réponse…" style="flex:1"><button class="primary" onclick="answerQ(${q.id})">Répondre</button></div>
+          ${pinBox("qp" + q.id, forParent(q.question + " " + (q.context || "")))}</div>`));
       todo.forEach(t => push(t.agent, `<div class="req req-t"><div class="req-kind">📝 À faire · priorité ${esc(t.priority)}</div>
           <label style="display:flex;gap:8px;align-items:flex-start;cursor:pointer"><input type="checkbox" onchange="doneTask(${t.id}, this.checked)" style="margin-top:4px">
-          <div><b>${esc(t.title)}</b><div class="md">${md(t.steps)}</div></div></label></div>`));
+          <div><b>${esc(t.title)}</b><div class="md">${md(t.steps)}</div></div></label>
+          ${pinBox("tp" + t.id, forParent(t.title + " " + (t.steps || "")))}</div>`));
       const who = Object.keys(groups);
       pane.innerHTML = `<div class="hero-card"><div class="big">${who.length ? who.length + " agent" + (who.length > 1 ? "s ont" : " a") + " besoin de toi" : "Rien ne t'attend 🎉"}</div>
           <div>${d.approvals.length} validation(s) · ${openQ.length} question(s) · ${todo.length} chose(s) à faire</div>
@@ -1005,9 +1012,15 @@ async function runDiag(btn) {
 async function answerQ(id, value) {
   const answer = value ?? ($("#qa" + id) || {}).value ?? "";
   if (!answer.trim()) return;
-  await post("/api/questions/" + id, {answer}); await poll(); renderPane();
+  const r = await post("/api/questions/" + id, {answer, parent_pin: ($("#qp" + id) || {}).value || ""});
+  if (!r.ok) { alert((await r.json().catch(() => ({}))).detail || "Erreur"); return; }
+  await poll(); renderPane();
 }
-async function doneTask(id, done) { await post(`/api/owner_tasks/${id}?done=${done}`); await poll(); renderPane(); }
+async function doneTask(id, done) {
+  const r = await post(`/api/owner_tasks/${id}?done=${done}`, {parent_pin: ($("#tp" + id) || {}).value || ""});
+  if (!r.ok) alert((await r.json().catch(() => ({}))).detail || "Erreur");
+  await poll(); renderPane();
+}
 async function saveBudget() {
   const r = await post("/api/budget/settings", {initial_eur: +$("#bi").value, api_budget_eur: +$("#ba").value, api_days: +$("#bd").value});
   if (!r.ok) alert("Erreur : " + (await r.text())); renderPane();
