@@ -11,7 +11,24 @@ from . import briefing, budget, db, delegation, integrations, mailbox, workflow
 from .agents import OWNER, Agent, system_prompt
 from .config import (MAX_STEPS_PER_CYCLE, OWNER_MINOR, PRICING, PUBLIC_URL, USD_EUR, WEB_SEARCH_COST,
                      model_for)
-from .tools import execute, file_blocks, products_overview, skills, tool_defs, toolbox
+from .tools import WORK_TOOLS_IGNORED, execute, file_blocks, products_overview, skills, tool_defs, toolbox
+PROMISE_FOLLOWUPS = 2  # relances au plus, ensuite la promesse est notée « non tenue » (et Patron le voit)
+
+
+def follow_promises(agent_name: str, work_ts: list[float], for_owner: bool, wake) -> None:
+    """Après un cycle : une annonce suivie d'un vrai travail est tenue ; sinon l'agent est relancé (2 fois au plus)."""
+    for p in db.q("SELECT * FROM promises WHERE agent=? AND status='ouverte' AND ts > ?",
+                  (agent_name, time.time() - 86400)):
+        if any(t >= p["ts"] for t in work_ts) or (p["followups"] and work_ts):
+            db.x("UPDATE promises SET status='tenue' WHERE id=?", (p["id"],))
+        elif p["followups"] >= PROMISE_FOLLOWUPS:
+            db.x("UPDATE promises SET status='non tenue' WHERE id=?", (p["id"],))
+            db.log(agent_name, "info", f"promesse non tenue : {p['text'][:150]}")
+        else:
+            db.x("UPDATE promises SET followups=followups+1 WHERE id=?", (p["id"],))
+            ask = (f"tiens ta promesse « {p['text'][:200]} » : fais-le MAINTENANT avec tes outils et montre le résultat "
+                   "(lien, fichier, capture), ou dis honnêtement pourquoi tu ne peux pas")
+            wake(agent_name, f"{OWNER} a demandé que tu {ask}" if for_owner else f"suivi de promesse : {ask}")
 
 client = anthropic.AsyncAnthropic(max_retries=4)
 
@@ -162,6 +179,10 @@ def build_context(agent: Agent, reason: str) -> str:
     hot_txt = ("\n".join(f"#{c['id']} {c['name'] or c['email'] or 'visiteur'} — {c['segment']}, {c['status']}, "
                          f"score {c['score']}, {c['sentiment']} : {c['interest'][:120]}" for c in hot) or "(aucun)")
     hot_txt += f"\n{waiting} contact(s) attendent une réponse." if waiting else ""
+    prom = db.q("SELECT agent, text, status, followups FROM promises WHERE ts > ? AND status != 'tenue' "
+                "ORDER BY id DESC LIMIT 12", (time.time() - 86400,))
+    promises_txt = "\n".join(f"- {p['agent']} [{p['status']}, relancé {p['followups']}×] : {p['text'][:140]}"
+                             for p in prom) or "(toutes les annonces ont été tenues)"
     if budget.unlimited():
         money_txt = (f"💶 BUDGET SANS LIMITE PAR JOUR : {OWNER} veut que vous travailliez À FOND, sans économiser ni "
                      "vous restreindre (seule la qualité compte, pas de remplissage). Seule limite : le budget IA total "
@@ -186,7 +207,7 @@ Raison du réveil : {reason}
 
 ## Mode de travail
 {mode_txt}
-{"" if agent.name != "Vice" else chr(10) + "## Délégation de " + OWNER + chr(10) + delegation.context_text() + chr(10)}
+{"" if agent.name != "Vice" else chr(10) + "## Délégation de " + OWNER + chr(10) + delegation.context_text() + chr(10) + chr(10) + "## Promesses de l'équipe (24 h)" + chr(10) + promises_txt + chr(10)}
 ## Consigne permanente de {OWNER}
 {owner_directive or DEFAULT_DIRECTIVE}
 
@@ -261,6 +282,7 @@ async def run_cycle(agent: Agent, reason: str, wake, for_owner: bool = False) ->
                        "recall (savoir de l'équipe), tes notes, le travail de l'équipe, ou web_fetch sur une adresse précise que tu "
                        "connais déjà. Les recherches reviennent demain.")
     db.add_cycle(agent.name)
+    work_ts: list[float] = []  # moments où l'agent a vraiment agi (pas seulement parlé)
     extra = ({"betas": ["server-side-fallback-2026-07-01"], "fallbacks": "default"}
              if ("opus" in model or "sonnet-5-5" in model or "fable" in model) else {})
     system = [{"type": "text", "text": system_prompt(agent), "cache_control": {"type": "ephemeral"}}]
@@ -300,6 +322,8 @@ async def run_cycle(agent: Agent, reason: str, wake, for_owner: bool = False) ->
                     db.log(agent.name, "web", f"{block.name}: {label}")
                 elif block.type == "tool_use":
                     db.log(agent.name, "outil", f"{block.name}", block.input)
+                    if block.name not in WORK_TOOLS_IGNORED:
+                        work_ts.append(time.time())
                     try:
                         result = await execute(agent.name, block.name, block.input, wake)
                         tool_results.append({"type": "tool_result", "tool_use_id": block.id, "content": result})
@@ -339,6 +363,8 @@ async def run_cycle(agent: Agent, reason: str, wake, for_owner: bool = False) ->
         st = db.get_states().get(agent.name, {})
         db.set_state(agent.name, cycles=(st.get("cycles") or 0) + 1)
         db.log(agent.name, "cycle", f"fin du cycle — coût {cycle_cost:.3f} $")
+        if not (limit_hit() or budget.api_exhausted()):
+            follow_promises(agent.name, work_ts, for_owner, wake)
 
 
 # --- réunion : tous les agents répondent en même temps, en quelques secondes -----------------------------

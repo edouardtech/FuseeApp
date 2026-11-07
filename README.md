@@ -300,6 +300,15 @@ prépare un **kit** (`prepare_itch_kit`) : le ZIP prêt pour itch.io, une couver
 textes et les étapes ; il te demande ton accord, puis **c'est toi qui publies** en 5 minutes. Jeu payant : les
 paiements doivent être au nom d'un parent.
 
+## 🤝 Faire, pas promettre
+
+Les agents doivent faire ce que tu demandes **tout de suite**, et ne plus dire « je vais faire » sans le faire :
+chaque annonce dans le groupe devient une **promesse suivie**. Si l'agent n'a rien fait après, il est relancé
+(2 fois au plus), puis la promesse est notée « non tenue » : Vice le voit, et le ☀️ récap du matin te le dit.
+Dans 📥 Demandes, **🆘 Aide-moi à le faire** (sous une tâche) et **🤔 Je ne sais pas, conseille-moi** (sous une
+question) ouvrent une discussion privée avec l'agent, qui fait ce qu'il peut à ta place et t'explique le reste.
+Bouton 💤 → **♾️ Toujours** : l'équipe travaille seule en permanence, jusqu'à ce que tu appuies sur Stop.
+
 ## 🔐 Autorisations (code parent)
 
 Dans ⚙️ Réglages → **🔐 Autorisations**, avec le **code parent**, tu choisis ce que **🎖️ Vice** peut accepter **à ta

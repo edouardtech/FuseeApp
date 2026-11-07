@@ -575,7 +575,7 @@ def set_work(w: WorkReq):
         budget.stop_work()
         db.post_message(OWNER, "⏹️ Stop : maintenant vous travaillez seulement quand je vous parle.")
         return _work_state()
-    hours = {"2h": 2, "24h": 24, "2j": 48, "3j": 72, "7j": 168}.get(w.choice)
+    hours = {"2h": 2, "24h": 24, "2j": 48, "3j": 72, "7j": 168, "toujours": 24 * 365 * 5}.get(w.choice)
     if w.choice == "nuit":
         until = budget.next_morning(7).timestamp()
     elif hours:

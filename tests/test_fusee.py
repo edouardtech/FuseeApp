@@ -421,7 +421,7 @@ def test_costs_page_data():
     assert c.post("/api/work", json={"choice": "nuit"}).json()["authorized"] is True
     assert c.get("/api/state").json()["work"]["authorized"] is True
     assert c.post("/api/work", json={"choice": "stop"}).json()["authorized"] is False
-    assert c.post("/api/work", json={"choice": "toujours"}).status_code == 400
+    assert c.post("/api/work", json={"choice": "pour-de-faux"}).status_code == 400
 
 
 def test_netlify_token_applies_without_restart(tmp_path, monkeypatch):
@@ -905,3 +905,39 @@ def test_parent_answers_questions_and_tasks_with_the_code():
               (time.time(), "Neo", "Regarder le site", "", "normale"))
     assert c.post(f"/api/owner_tasks/{t2}?done=true").json() == {"ok": True, "by_parent": False}  # sans corps : ok
     parent._fails.clear()
+
+
+# --- faire, pas promettre ----------------------------------------------------------------------------------
+
+def test_promises_are_followed_up_until_kept():
+    from fusee_agents import runner
+    from fusee_agents.scheduler import why_may_work
+    db.x("DELETE FROM promises")
+    out = asyncio.run(tools.execute("Neo", "post_message", {"content": "Je vais faire la page Tarifs !", "attachments": [],
+                                                              "links": []}, lambda *a: None))
+    assert "fais-le MAINTENANT" in out
+    assert asyncio.run(tools.execute("Neo", "post_message", {"content": "La page Tarifs est en ligne : voici la capture.",
+                                                             "attachments": [], "links": []}, lambda *a: None)) == "Message envoyé."
+    woken = []
+    runner.follow_promises("Neo", [], True, lambda n, r: woken.append((n, r)))  # il n'a rien fait : relancé
+    assert woken and woken[0][0] == "Neo" and "tiens ta promesse" in woken[0][1]
+    assert why_may_work("Neo", woken[0][1]) == "patron"  # la relance passe même quand l'équipe attend
+    runner.follow_promises("Neo", [], True, lambda n, r: woken.append((n, r)))
+    runner.follow_promises("Neo", [], True, lambda n, r: woken.append((n, r)))  # 3e fois : non tenue
+    assert db.q("SELECT status FROM promises")[0]["status"] == "non tenue" and len(woken) == 2
+    asyncio.run(tools.execute("Pixel", "post_message", {"content": "Je m'en occupe tout de suite", "attachments": [],
+                                                         "links": []}, lambda *a: None))
+    runner.follow_promises("Pixel", [time.time() + 1], True, lambda *a: None)  # il a agi après : tenue
+    assert db.q("SELECT status FROM promises WHERE agent='Pixel'")[0]["status"] == "tenue"
+    assert "Promesses" in runner.build_context(BY_NAME["Vice"], "test")
+    assert "non tenue" in __import__("fusee_agents.briefing", fromlist=["x"]).morning_recap(time.time() - 60)
+    assert "Faire, pas promettre" in system_prompt(BY_NAME["Neo"])
+
+
+def test_always_autonomous_until_stop():
+    from fastapi.testclient import TestClient
+    from fusee_agents import web
+    c = TestClient(web.app)
+    w = c.post("/api/work", json={"choice": "toujours"}).json()
+    assert w["authorized"] and w["label"] == "nouvel ordre (Stop)"
+    assert c.post("/api/work", json={"choice": "stop"}).json()["authorized"] is False

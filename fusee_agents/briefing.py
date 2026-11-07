@@ -171,6 +171,11 @@ def morning_recap(since_ts: float) -> str:
         out += [f"- 📋 {tasks_open} tâche(s) pour toi dans 📥 Demandes."]
     if talk:
         out += ["", "## 💬 Derniers messages de l'équipe"] + [f"- {m['sender']} : {m['content'][:150]}" for m in talk]
+    broken = db.q("SELECT agent, text FROM promises WHERE ts >= ? AND status='non tenue' ORDER BY id", (since_ts,))
+    kept = db.q("SELECT COUNT(*) n FROM promises WHERE ts >= ? AND status='tenue'", (since_ts,))[0]["n"]
+    if broken or kept:
+        out += ["", f"## 🤝 Promesses : {kept} tenue(s), {len(broken)} non tenue(s)"]
+        out += [f"- ❌ {b['agent']} : {b['text'][:140]}" for b in broken[:6]]
     if errors:
         out += ["", f"## ⚠️ {len(errors)} erreur(s)"] + [f"- {e}" for e in errors[-3:]]
     return "\n".join(out)

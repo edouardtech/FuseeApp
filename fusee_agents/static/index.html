@@ -153,6 +153,7 @@ nav#bottom{display:none}
   <button data-w="24h">☀️ Pendant 24 heures</button>
   <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px">
     <button data-w="2j">📅 2 jours</button><button data-w="3j">📅 3 jours</button><button data-w="7j">🗓️ 1 semaine</button></div>
+  <button data-w="toujours">♾️ Toujours, autonomes (jusqu'à ce que j'appuie sur Stop)</button>
   <div style="border-top:1px solid var(--line);padding-top:8px;display:grid;gap:6px">
     <b>📅 Programmer à l'avance</b>
     <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">Début :
@@ -520,11 +521,13 @@ async function renderPane(soft) {
           <b>${esc(q.question)}</b>${q.context ? `<div class="muted">${esc(q.context)}</div>` : ""}
           <div style="margin-top:6px">${q.options.map(o => `<button onclick='answerQ(${q.id}, ${JSON.stringify(o).replace(/'/g, "&#39;")})'>${esc(o)}</button> `).join("")}</div>
           <div style="display:flex;gap:6px;margin-top:6px"><input id="qa${q.id}" placeholder="Ta réponse…" style="flex:1"><button class="primary" onclick="answerQ(${q.id})">Répondre</button></div>
-          ${pinBox("qp" + q.id, forParent(q.question + " " + (q.context || "")))}</div>`));
+          ${pinBox("qp" + q.id, forParent(q.question + " " + (q.context || "")))}
+          <button style="margin-top:6px" onclick='helpMe(${JSON.stringify(q.agent)}, ${JSON.stringify("q")}, ${JSON.stringify(q.question).replace(/'/g, "&#39;")})'>🤔 Je ne sais pas, conseille-moi</button></div>`));
       todo.forEach(t => push(t.agent, `<div class="req req-t"><div class="req-kind">📝 À faire · priorité ${esc(t.priority)}</div>
           <label style="display:flex;gap:8px;align-items:flex-start;cursor:pointer"><input type="checkbox" onchange="doneTask(${t.id}, this.checked)" style="margin-top:4px">
           <div><b>${esc(t.title)}</b><div class="md">${md(t.steps)}</div></div></label>
-          ${pinBox("tp" + t.id, forParent(t.title + " " + (t.steps || "")))}</div>`));
+          ${pinBox("tp" + t.id, forParent(t.title + " " + (t.steps || "")))}
+          <button style="margin-top:6px" onclick='helpMe(${JSON.stringify(t.agent)}, ${JSON.stringify("t")}, ${JSON.stringify(t.title).replace(/'/g, "&#39;")})'>🆘 Aide-moi à le faire</button></div>`));
       const who = Object.keys(groups);
       pane.innerHTML = `<div class="hero-card"><div class="big">${who.length ? who.length + " agent" + (who.length > 1 ? "s ont" : " a") + " besoin de toi" : "Rien ne t'attend 🎉"}</div>
           <div>${d.approvals.length} validation(s) · ${openQ.length} question(s) · ${todo.length} chose(s) à faire</div>
@@ -1008,6 +1011,15 @@ async function runDiag(btn) {
   box.innerHTML = `<p><b>${d.ok ? "✅ Tout marche : l'équipe est prête !" : "⚠️ Certains agents ont un problème :"}</b></p><table>` +
     d.results.map(x => `<tr><td>${emojiOf(x.agent)} ${x.agent}</td><td>${x.ok ? "✅" : "❌"}</td><td class="muted">${esc(x.model.replace("claude-", ""))}${x.ok ? ` · ${x.secondes} s` : ""}</td></tr>` +
       (x.ok ? "" : `<tr><td colspan="3" class="neg" style="font-size:12px">${esc(x.message)}</td></tr>`)).join("") + "</table>";
+}
+async function helpMe(agent, kind, title) {
+  const who = S.agents.find(a => a.name === agent) ? agent : "Vice";
+  const text = kind === "t"
+    ? `🆘 Aide-moi à faire « ${title} ». Fais d'abord toi-même TOUT ce que tu peux faire à ma place, puis explique-moi le reste étape par étape, très simplement (où cliquer, quoi écrire), une étape à la fois.`
+    : `🤔 Pour ta question « ${title} » : je ne sais pas quoi répondre. Donne-moi ton conseil (ce que tu choisirais et pourquoi), en 3 phrases simples, puis je déciderai.`;
+  const r = await post("/api/dm/" + who, {content: text});
+  if (!r.ok) { alert((await r.json().catch(() => ({}))).detail || "Impossible"); return; }
+  selected = who; tab = "agent"; renderAgents(); renderTabs(); renderPane(); setView("more");
 }
 async function answerQ(id, value) {
   const answer = value ?? ($("#qa" + id) || {}).value ?? "";

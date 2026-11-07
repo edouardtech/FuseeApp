@@ -580,6 +580,15 @@ def _attach_json(attachments: list[str], links: list[str]) -> str:
     return json.dumps({"files": _clean_attachments(attachments), "links": links}, ensure_ascii=False)
 
 
+# Phrases d'annonce (« je vais… », « je m'en occupe ») : chaque annonce devient une promesse suivie
+PROMISE_RE = re.compile(r"\b(je vais|j'vais|je m'en occupe|je m'occupe|je (lance|pr[ée]pare|commence|cr[ée]e|termine|"
+                        r"finis|reviens|m'y mets)|on va (faire|lancer|cr[ée]er|pr[ée]parer)|c'est en cours|"
+                        r"dans (quelques|\d+) (minutes?|heures?)|bient[ôo]t pr[êe]t)", re.I)
+WORK_TOOLS_IGNORED = {"post_message", "set_status", "save_memory", "remember", "recall", "list_skills",
+                      "read_skill", "list_files", "list_toolbox", "list_needs", "list_approvals", "list_owner_items",
+                      "budget_status", "list_products", "list_contacts", "list_prospects", "list_jobs", "list_content"}
+
+
 IMAGE_TYPES = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif",
                ".webp": "image/webp"}
 TEXT_EXT = {".txt", ".md", ".csv", ".json", ".html", ".css", ".js", ".py", ".xml", ".yaml", ".yml"}
@@ -703,6 +712,11 @@ async def execute(agent: str, name: str, args: dict, wake) -> str:
         for m in mentions(content):
             if m != agent:
                 wake(m, f"mentionné par {agent} : {content[:300]}")
+        if PROMISE_RE.search(content):
+            db.x("INSERT INTO promises (ts, agent, text) VALUES (?,?,?)", (time.time(), agent, content[:500]))
+            return ("Message envoyé. ⚠️ Tu viens d'ANNONCER quelque chose : fais-le MAINTENANT, dans ce cycle, avec tes "
+                    "outils, puis montre le résultat (lien, fichier, capture). Sinon tu seras relancé et "
+                    f"{OWNER} le verra dans son récap.")
         return "Message envoyé."
     if name == "save_memory":
         db.set_memory(agent, args["content"][:6000])

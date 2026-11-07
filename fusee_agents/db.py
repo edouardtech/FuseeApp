@@ -72,6 +72,8 @@ CREATE TABLE IF NOT EXISTS dms (id INTEGER PRIMARY KEY, ts REAL, agent TEXT, sen
     attachments TEXT, read INTEGER DEFAULT 0);
 CREATE TABLE IF NOT EXISTS push_subs (endpoint TEXT PRIMARY KEY, data TEXT, device TEXT, ts REAL);
 CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT);
+CREATE TABLE IF NOT EXISTS promises (id INTEGER PRIMARY KEY, ts REAL, agent TEXT, text TEXT,
+    status TEXT DEFAULT 'ouverte', followups INTEGER DEFAULT 0);
 CREATE TABLE IF NOT EXISTS usage_agent (day TEXT, agent TEXT, cost_usd REAL DEFAULT 0, searches INTEGER DEFAULT 0,
     cycles INTEGER DEFAULT 0, PRIMARY KEY (day, agent));
 """

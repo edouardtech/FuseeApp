@@ -121,6 +121,8 @@ def next_morning(hour: int = 7, now: datetime | None = None) -> datetime:
 
 def when_label(ts: float, now: datetime | None = None) -> str:
     d, now = datetime.fromtimestamp(ts), now or datetime.now()
+    if (d - now).days > 365:
+        return "nouvel ordre (Stop)"
     hm = f"{d.hour} h" + (f"{d.minute:02d}" if d.minute else "")
     if d.date() == now.date():
         return hm
