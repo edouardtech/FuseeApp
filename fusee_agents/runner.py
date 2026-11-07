@@ -191,6 +191,11 @@ def build_context(agent: Agent, reason: str) -> str:
     else:
         money_txt = (f"Ce travail en solo s'arrête à {round(budget.autonomous_share() * 100)} % du budget du jour : le "
                      f"reste est gardé pour quand {OWNER} vous parle.")
+    away_txt = ("" if budget.owner_available() else
+                f"\n🔴 {OWNER} N'EST PAS DISPONIBLE : ne lui envoie AUCUNE demande, question, tâche ni notification "
+                "(elles seraient gardées pour son retour, sans le prévenir). Avance sur tout ce qui ne dépend pas de lui ; "
+                "ce qui ne peut vraiment pas attendre : submit_need (Clara regroupera tout pour son retour). Vice décide "
+                "ce qui lui est délégué.")
     if budget.work_authorized():
         mode_txt = (f"{OWNER} vous a autorisés à travailler SEULS jusqu'à {budget.when_label(budget.work_until())} : "
                     "avancez sur vos projets en équipe sans attendre ses messages (request_approval avant de publier). "
@@ -206,7 +211,7 @@ Raison du réveil : {reason}
 {budget_txt}{MINOR_TXT if OWNER_MINOR else ""}
 
 ## Mode de travail
-{mode_txt}
+{mode_txt}{away_txt}
 {"" if agent.name != "Vice" else chr(10) + "## Délégation de " + OWNER + chr(10) + delegation.context_text() + chr(10) + chr(10) + "## Promesses de l'équipe (24 h)" + chr(10) + promises_txt + chr(10)}
 ## Consigne permanente de {OWNER}
 {owner_directive or DEFAULT_DIRECTIVE}

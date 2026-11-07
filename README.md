@@ -309,6 +309,12 @@ Dans 📥 Demandes, **🆘 Aide-moi à le faire** (sous une tâche) et **🤔 Je
 question) ouvrent une discussion privée avec l'agent, qui fait ce qu'il peut à ta place et t'explique le reste.
 Bouton 💤 → **♾️ Toujours** : l'équipe travaille seule en permanence, jusqu'à ce que tu appuies sur Stop.
 
+## 🟢 / 🔴 Je suis là / Pas disponible
+
+Bouton en haut. **🔴 Pas disponible** : les agents savent qu'ils ne doivent rien t'envoyer ; leurs demandes,
+questions et notifications sont **gardées** (dans l'appli, sans notification) et ils avancent sur tout ce qui
+ne dépend pas de toi. **🟢 Je suis là** : une notification te dit tout ce qui t'attend dans 📥 Demandes.
+
 ## 🔐 Autorisations (code parent)
 
 Dans ⚙️ Réglages → **🔐 Autorisations**, avec le **code parent**, tu choisis ce que **🎖️ Vice** peut accepter **à ta

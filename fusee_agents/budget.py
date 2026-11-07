@@ -140,6 +140,11 @@ def range_label(from_ts: float, until_ts: float, now: datetime | None = None) ->
     return f"{when_label(from_ts, now)} → {end}"
 
 
+def owner_available() -> bool:
+    """🟢 / 🔴 : quand Patron n'est pas disponible, rien ne lui est envoyé (demandes gardées pour son retour)."""
+    return db.get_setting("owner_available", "1") == "1"
+
+
 def note_owner_active() -> None:
     db.set_setting("owner_active_until", str(time.time() + OWNER_WINDOW_S))
 

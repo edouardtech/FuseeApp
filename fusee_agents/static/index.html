@@ -141,6 +141,7 @@ nav#bottom{display:none}
   <button id="themeBtn" title="Thème clair / sombre">🌗</button>
   <button id="installBtn" hidden>📲<span class="lbl"> Installer l'app</span></button>
   <button id="browserBtn" title="Autoriser les agents à naviguer sur internet avec un vrai navigateur"></button>
+  <button id="availBtn" title="Dire à l'équipe si tu es là ou pas"></button>
   <button id="workBtn" title="Quand l'équipe travaille : seulement quand tu parles, ou seule pendant un moment"></button>
   <button id="directiveBtn" title="Consigne permanente lue par tous les agents">🎯<span class="lbl"> Consigne</span></button>
   <button id="pauseBtn"></button>
@@ -370,6 +371,8 @@ async function poll() {
     $("#cost").innerHTML = `${r.budget.remaining_eur.toFixed(0)} €<span class="hide-mi"> · IA ${r.budget.api_today_eur.toFixed(2)}/${r.budget.unlimited ? "∞" : r.budget.api_daily_cap_eur.toFixed(2) + " €"}</span>`;
     $("#costbar").style.width = Math.min(100, 100 * r.budget.api_today_eur / Math.max(r.budget.api_daily_cap_eur, 0.01)) + "%";
     $("#pauseBtn").innerHTML = r.paused ? "▶️<span class=lbl> Reprendre</span>" : "⏸️<span class=lbl> Pause</span>";
+    $("#availBtn").innerHTML = r.available === false ? "🔴<span class=lbl> Pas disponible</span>" : "🟢<span class=lbl> Je suis là</span>";
+    $("#availBtn").classList.toggle("on", r.available !== false);
     if (!r.work) {  // page à jour mais Fusée pas encore redémarré : on le dit au lieu de bloquer l'affichage
       $("#workBtn").innerHTML = "♻️<span class=lbl> Redémarrer pour finir la mise à jour</span>";
       $("#workBtn").onclick = () => post("/api/setup/restart").then(() => setTimeout(() => location.reload(), 6000));
@@ -1085,6 +1088,7 @@ $("#meetBtn").onclick = async () => {
 };
 $("#txt").onkeydown = e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("#f").requestSubmit(); } };
 $("#pauseBtn").onclick = async () => { await post("/api/pause?on=" + !S.paused); poll(); };
+$("#availBtn").onclick = async () => { await post("/api/availability", {available: S.available === false}); poll(); };
 $("#workBtn").onclick = e => {
   e.stopPropagation(); if (!S.work) return;
   if ($("#workMenu").hidden) {

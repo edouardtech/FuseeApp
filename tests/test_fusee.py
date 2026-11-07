@@ -941,3 +941,23 @@ def test_always_autonomous_until_stop():
     w = c.post("/api/work", json={"choice": "toujours"}).json()
     assert w["authorized"] and w["label"] == "nouvel ordre (Stop)"
     assert c.post("/api/work", json={"choice": "stop"}).json()["authorized"] is False
+
+
+def test_owner_unavailable_holds_requests_until_return(monkeypatch):
+    from fastapi.testclient import TestClient
+    from fusee_agents import notify, runner, web
+    sent = []
+    monkeypatch.setattr(notify, "_deliver", lambda kind, title, body, priority: sent.append(title))
+    c = TestClient(web.app)
+    assert c.post("/api/availability", json={"available": False}).json() == {"available": False}
+    assert "Je ne suis pas disponible" in db.recent_messages(1)[0]["content"]
+    assert "N'EST PAS DISPONIBLE" in runner.build_context(BY_NAME["Victor"], "test")
+    out = asyncio.run(tools.execute("Victor", "notify_owner", {"title": "Urgent", "body": "x"}, lambda *a: None))
+    assert "PAS disponible" in out and sent == []  # gardé dans l'appli, rien sur le téléphone
+    out = asyncio.run(tools.execute("Clara", "ask_owner", {"question": "Quel nom pour l'agence ?", "context": "",
+                                    "options": [], "on_behalf_of": "Victor", "need_ids": []}, lambda *a: None))
+    assert "gardé pour son retour" in out and sent == []
+    assert c.get("/api/state").json()["available"] is False
+    assert c.post("/api/availability", json={"available": True}).json() == {"available": True}
+    assert sent and sent[-1] == "📥 Ce qui t'attend"  # au retour : tout d'un coup
+    assert "N'EST PAS DISPONIBLE" not in runner.build_context(BY_NAME["Victor"], "test")

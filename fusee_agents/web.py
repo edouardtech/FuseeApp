@@ -162,6 +162,7 @@ def state(after: int = 0):
         "profile_done": bool(owner_profile().get("prenom")),
         "paused": scheduler.paused,
         "work": _work_state(),
+        "available": budget.owner_available(),
         "directive": db.get_setting("directive", ""),
         "pending_approvals": db.q("SELECT COUNT(*) n FROM approvals WHERE status='en attente'")[0]["n"],
         "unread_notifications": db.q("SELECT COUNT(*) n FROM notifications WHERE read=0")[0]["n"],
@@ -546,6 +547,27 @@ class WorkReq(BaseModel):
     h_to: int = 17
     reserve: int | None = None  # % du budget du jour gardé pour Patron
     end_days: int | None = None  # pour « plan » : fin N jours après le début (None = le jour même ou le lendemain)
+
+
+class Availability(BaseModel):
+    available: bool
+
+
+@app.post("/api/availability")
+def set_availability(a: Availability):
+    """🟢 Je suis là / 🔴 Pas disponible : absent, rien ne t'est envoyé ; de retour, tout t'est présenté d'un coup."""
+    was = budget.owner_available()
+    db.set_setting("owner_available", "1" if a.available else "0")
+    if a.available and not was:
+        n_appr = db.q("SELECT COUNT(*) n FROM approvals WHERE status='en attente'")[0]["n"]
+        n_q = db.q("SELECT COUNT(*) n FROM owner_questions WHERE answer IS NULL")[0]["n"]
+        n_t = db.q("SELECT COUNT(*) n FROM owner_tasks WHERE done=0")[0]["n"]
+        db.post_message(OWNER, "🟢 Je suis de retour : vous pouvez m'envoyer vos demandes.")
+        notify("retour", "📥 Ce qui t'attend", f"{n_appr} validation(s), {n_q} question(s), {n_t} tâche(s) dans 📥 Demandes.")
+    elif not a.available and was:
+        db.post_message(OWNER, "🔴 Je ne suis pas disponible : ne m'envoyez rien, gardez vos demandes pour mon retour. "
+                               "Avancez sur tout ce qui ne dépend pas de moi.")
+    return {"available": budget.owner_available()}
 
 
 @app.post("/api/work")

@@ -96,6 +96,8 @@ def notify(kind: str, title: str, body: str, priority: str = "default") -> None:
     """kind : validation | rapport | client | alerte. priority : min|low|default|high|urgent."""
     db.x("INSERT INTO notifications (ts, kind, title, body) VALUES (CAST(strftime('%s','now') AS REAL),?,?,?)",
          (kind, title, body[:4000]))
+    if db.get_setting("owner_available", "1") == "0" and kind != "retour":
+        return  # 🔴 Patron pas disponible : gardé dans l'appli, présenté à son retour
     try:
         loop = asyncio.get_running_loop()
         loop.run_in_executor(None, _deliver, kind, title, body, priority)

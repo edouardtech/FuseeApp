@@ -775,10 +775,15 @@ async def execute(agent: str, name: str, args: dict, wake) -> str:
         db.post_message(agent, f"🙋 Demande de validation #{i} pour @{OWNER} ({args['kind']}) : {args['title']}{money}{who}", att)
         notify("validation", f"{agent} demande ton accord : {args['title']}",
                f"{args['kind']}{money}\n\n{args['details'][:1500]}", priority="high")
-        return f"Demande #{i} envoyée à {OWNER}. N'agis pas avant sa réponse ; continue sur autre chose."
+        return (f"Demande #{i} envoyée à {OWNER}. N'agis pas avant sa réponse ; continue sur autre chose."
+                + (" (Vice peut la décider si Patron l'y a autorisé.)" if delegation.active() else "")
+                + (f" ⏸️ {OWNER} n'est PAS disponible : c'est gardé pour son retour, sans notification. Ne redemande pas ; "
+                 "continue sur tout ce qui ne dépend pas de lui." if not budget.owner_available() else ""))
     if name == "notify_owner":
         notify("alerte", f"{agent} : {args['title']}", args["body"], priority="high")
-        return "Notification envoyée."
+        return "Notification envoyée." + (f" ⏸️ {OWNER} n'est PAS disponible : c'est gardé pour son retour, sans notification. Ne redemande pas ; "
+                 "continue sur tout ce qui ne dépend pas de lui." if not budget.owner_available() else "")
+
     # --- fichiers & code ----------------------------------------------------
     if name == "list_files":
         base = _safe_path(args["path"])
@@ -1271,7 +1276,8 @@ async def execute(agent: str, name: str, args: dict, wake) -> str:
         db.x("INSERT INTO dms (ts, agent, sender, content, attachments, read) VALUES (?,?,?,?,?,0)",
              (time.time(), agent, agent, args["content"].strip(), _attach_json(args["attachments"], args["links"])))
         notify("client", f"💬 {agent} t'écrit en privé", args["content"][:500], priority="default")
-        return f"Message privé envoyé à {OWNER}."
+        return f"Message privé envoyé à {OWNER}." + (f" ⏸️ {OWNER} n'est PAS disponible : c'est gardé pour son retour, sans notification. Ne redemande pas ; "
+                 "continue sur tout ce qui ne dépend pas de lui." if not budget.owner_available() else "")
     if name == "submit_need":
         dup = db.q("SELECT id FROM needs WHERE agent=? AND need=? AND status!='résolu'", (agent, args["need"]))
         if dup:
@@ -1310,7 +1316,8 @@ async def execute(agent: str, name: str, args: dict, wake) -> str:
         urgent = any(r["urgency"] == "bloquant" for r in db.q(
             f"SELECT urgency FROM needs WHERE id IN ({','.join('?' * len(ids))})", tuple(ids))) if ids else False
         notify("validation", f"{label} a besoin de toi", args["question"], priority="high" if urgent else "default")
-        return f"Question #{i} posée à {OWNER} au nom de {who}. {who} sera réveillé avec la réponse."
+        return f"Question #{i} posée à {OWNER} au nom de {who}. {who} sera réveillé avec la réponse." + (f" ⏸️ {OWNER} n'est PAS disponible : c'est gardé pour son retour, sans notification. Ne redemande pas ; "
+                 "continue sur tout ce qui ne dépend pas de lui." if not budget.owner_available() else "")
     if name == "add_owner_task":
         who = args["on_behalf_of"] or agent
         ids = [int(n) for n in args["need_ids"]][:10]
@@ -1323,7 +1330,8 @@ async def execute(agent: str, name: str, args: dict, wake) -> str:
         db.post_message(agent, f"📝 @{OWNER}, {label} a besoin que tu fasses : {args['title']}")
         if args["priority"] == "haute":
             notify("alerte", f"À faire pour {who} : {args['title']}", args["steps"][:1500], priority="high")
-        return f"Tâche #{i} ajoutée à la liste de {OWNER} (pour {who})."
+        return f"Tâche #{i} ajoutée à la liste de {OWNER} (pour {who})." + (f" ⏸️ {OWNER} n'est PAS disponible : c'est gardé pour son retour, sans notification. Ne redemande pas ; "
+                 "continue sur tout ce qui ne dépend pas de lui." if not budget.owner_available() else "")
     if name == "list_owner_items":
         qs = db.q("SELECT id, agent, question, answer FROM owner_questions WHERE answer IS NULL OR answered_ts > ? "
                   "ORDER BY id DESC LIMIT 20", (time.time() - 3 * 86400,))
