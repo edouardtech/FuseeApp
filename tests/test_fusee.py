@@ -1012,3 +1012,17 @@ def test_pace_rapide_and_turbo(monkeypatch):
     budget.stop_work()
     assert not budget.turbo_on()
     c.post("/api/work", json={"pace": "normal"})
+
+
+def test_changing_pace_wakes_the_team_right_away():
+    from fastapi.testclient import TestClient
+    from fusee_agents import web
+    c = TestClient(web.app)
+    budget.authorize_work(time.time() + 3600)
+    for a in ("Neo", "Atlas"):
+        web.scheduler.reasons[a].clear()
+    c.post("/api/work", json={"pace": "rapide"})
+    assert any(r.startswith("autorisation") for r in web.scheduler.reasons["Neo"])
+    assert any(r.startswith("autorisation") for r in web.scheduler.reasons["Atlas"])
+    c.post("/api/work", json={"pace": "normal"})
+    budget.stop_work()

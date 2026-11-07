@@ -97,6 +97,9 @@ class Scheduler:
             try:
                 iv = interval()
                 timeout = max(0, iv - agent.min_gap_s) if iv else None
+                if timeout and budget.work_authorized() and not self.reasons[name] and \
+                        (db.get_states().get(name) or {}).get("status") == "en attente":
+                    db.set_state(name, status=f"⏳ reprend vers {datetime.fromtimestamp(time.time() + timeout):%H:%M}")
                 await asyncio.wait_for(self.events[name].wait(), timeout=timeout)
             except asyncio.TimeoutError:
                 pass

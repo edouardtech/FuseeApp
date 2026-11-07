@@ -583,8 +583,8 @@ def set_work(w: WorkReq):
         if w.pace not in budget.PACES:
             raise HTTPException(400, "rythme inconnu")
         db.set_setting("pace", w.pace)
-        if w.pace == "turbo" and budget.work_authorized():
-            scheduler._kick()  # tout le monde démarre tout de suite
+        if w.pace in ("rapide", "turbo") and budget.work_authorized():
+            scheduler._kick()  # tout le monde repart tout de suite, avec le nouveau rythme
         if not w.choice and w.reserve is None:
             return _work_state()
     if w.reserve is not None:
