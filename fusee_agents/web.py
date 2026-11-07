@@ -532,7 +532,9 @@ def costs():
 
 def _work_state() -> dict:
     on, planned = budget.work_authorized(), budget.work_scheduled()
-    extra = {"unlimited": budget.unlimited(), "reserve_total_eur": budget.total_reserve_eur()}
+    extra = {"unlimited": budget.unlimited(), "reserve_total_eur": budget.total_reserve_eur(), "pace": budget.pace(),
+             "turbo_on": budget.turbo_on(), "hour_eur": budget.spent_last_hour_eur(),
+             "turbo_cap_eur": budget.TURBO_MAX_EUR_PER_HOUR}
     return {"authorized": on, "until": budget.work_until() if on or planned else 0,
             "label": budget.when_label(budget.work_until()) if on or planned else "",
             "scheduled": planned, "from_label": budget.when_label(budget.work_from()) if planned else "",
@@ -547,6 +549,7 @@ class WorkReq(BaseModel):
     h_to: int = 17
     reserve: int | None = None  # % du budget du jour gardé pour Patron
     end_days: int | None = None  # pour « plan » : fin N jours après le début (None = le jour même ou le lendemain)
+    pace: str | None = None  # ⚡ rythme du travail en solo : normal | rapide | turbo
 
 
 class Availability(BaseModel):
@@ -576,6 +579,14 @@ def set_availability(a: Availability):
 @app.post("/api/work")
 def set_work(w: WorkReq):
     """Patron autorise l'équipe à travailler seule pendant un moment (sinon elle attend qu'il parle)."""
+    if w.pace is not None:
+        if w.pace not in budget.PACES:
+            raise HTTPException(400, "rythme inconnu")
+        db.set_setting("pace", w.pace)
+        if w.pace == "turbo" and budget.work_authorized():
+            scheduler._kick()  # tout le monde démarre tout de suite
+        if not w.choice and w.reserve is None:
+            return _work_state()
     if w.reserve is not None:
         if not 10 <= w.reserve <= 90:
             raise HTTPException(400, "réserve entre 10 et 90 %")

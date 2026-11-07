@@ -985,3 +985,30 @@ def test_new_teams_and_agents():
     web.scheduler.reasons["Bilan"].clear()
     c.post("/api/availability", json={"available": True})
     assert any("récap des demandes" in r for r in web.scheduler.reasons["Bilan"])
+
+
+def test_pace_rapide_and_turbo(monkeypatch):
+    from fastapi.testclient import TestClient
+    from fusee_agents import runner, web
+    from fusee_agents.scheduler import Scheduler, why_may_work
+    c = TestClient(web.app)
+    assert c.post("/api/work", json={"pace": "fusée"}).status_code == 400
+    budget.authorize_work(time.time() + 3600)
+    w = c.post("/api/work", json={"pace": "turbo"}).json()
+    assert w["pace"] == "turbo" and w["turbo_on"] and w["turbo_cap_eur"] == 2.0
+    s = Scheduler()
+    assert s.max_parallel() == 5
+    s.running = {"Neo", "Pixel"}
+    woken = s.turbo_tick()
+    assert len(woken) == 3 and not set(woken) & {"Neo", "Pixel"}  # 2 au travail → 3 de plus
+    db.set_setting("owner_active_until", "0")  # Patron n'a pas parlé récemment
+    assert why_may_work(woken[0], s.reasons[woken[0]][-1]) == "autonome"
+    assert "MODE TURBO" in runner.build_context(BY_NAME["Neo"], "test")
+    # sécurité : plus de 2 € dépensés dans l'heure → le turbo se met en pause
+    monkeypatch.setattr(budget, "spent_last_hour_eur", lambda: 2.5)
+    assert not budget.turbo_on() and s.turbo_tick() == [] and s.max_parallel() == 2
+    monkeypatch.undo()
+    # pas pendant que Patron n'a pas laissé l'équipe seule
+    budget.stop_work()
+    assert not budget.turbo_on()
+    c.post("/api/work", json={"pace": "normal"})

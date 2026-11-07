@@ -36,7 +36,8 @@ class Scheduler:
         self.events = {a.name: asyncio.Event() for a in TEAM}
         self.reasons: dict[str, list[str]] = {a.name: [] for a in TEAM}
         self.deferred: dict[str, list[str]] = {a.name: [] for a in TEAM}  # appels reçus pendant qu'il attendait
-        self.sem = asyncio.Semaphore(MAX_PARALLEL_AGENTS)
+        self.running: set[str] = set()  # agents en plein cycle
+        self._turn = 0                   # tour de rôle du turbo
         self.tasks: list[asyncio.Task] = []
 
     @property
@@ -54,7 +55,14 @@ class Scheduler:
         agent = BY_NAME[name]
 
         def interval() -> float:  # l'équipe peut changer le rythme d'un agent (adjust_agent)
-            return agent_settings(name).get("interval_min", agent.interval_min) * 60 * INTERVAL_MULTIPLIER
+            base = agent_settings(name).get("interval_min", agent.interval_min) * 60 * INTERVAL_MULTIPLIER
+            if base and budget.work_authorized():  # ⚡ rythme choisi par Patron pour le travail en solo
+                p = budget.pace()
+                if p == "rapide":
+                    return max(15 * 60, base / 6)
+                if p == "turbo":
+                    return max(5 * 60, base / 18)
+            return base
 
         await asyncio.sleep(first_delay)
         reason = "démarrage"
@@ -77,8 +85,11 @@ class Scheduler:
                     if self.deferred[name]:
                         reason = " | ".join(self.deferred[name] + [reason])
                         self.deferred[name] = []
-                    async with self.sem:
+                    await self._acquire(name)
+                    try:
                         await run_cycle(agent, reason, self.wake, for_owner=why in ("patron", "client"))
+                    finally:
+                        self.running.discard(name)
             # attendre le prochain cycle (ou une mention), avec un délai minimum anti ping-pong
             await asyncio.sleep(agent.min_gap_s)
             if not self.reasons[name]:
@@ -92,6 +103,40 @@ class Scheduler:
             self.events[name].clear()
             pending, self.reasons[name] = self.reasons[name], []
             reason = " | ".join(pending[-5:]) if pending else "cycle régulier"
+
+    def max_parallel(self) -> int:
+        return max(MAX_PARALLEL_AGENTS, budget.TURBO_MIN_ACTIVE) if budget.turbo_on() else MAX_PARALLEL_AGENTS
+
+    async def _acquire(self, name: str) -> None:
+        """Une place pour travailler : 2 agents à la fois d'habitude, 5 en turbo."""
+        while len(self.running) >= self.max_parallel():
+            await asyncio.sleep(0.5)
+        self.running.add(name)
+
+    async def _turbo(self) -> None:
+        """🚀 Turbo : toutes les 10 s, s'il y a moins de 5 agents au travail, on en réveille d'autres (à tour de rôle)."""
+        while True:
+            await asyncio.sleep(10)
+            self.turbo_tick()
+
+    def turbo_tick(self) -> list[str]:
+        """Réveille assez d'agents (à tour de rôle) pour qu'au moins 5 travaillent. Renvoie ceux réveillés."""
+        if self.paused or not budget.turbo_on() or budget.autonomous_budget_used():
+            return []
+        missing = budget.TURBO_MIN_ACTIVE - len(self.running)
+        pool = [a.name for a in TEAM if a.name in self.events and a.name not in self.running
+                and agent_settings(a.name).get("enabled", True) is not False
+                and agent_settings(a.name).get("interval_min", a.interval_min) and not self.reasons[a.name]]
+        woken = []
+        for _ in range(max(0, min(missing, len(pool)))):
+            name = pool[self._turn % len(pool)]
+            self._turn += 1
+            if name in woken:
+                continue
+            woken.append(name)
+            self.wake(name, "turbo : l'équipe doit rester active — fais avancer la mission en cours avec du VRAI "
+                            "travail (outils), et coordonne-toi avec tes coéquipiers dans le groupe (@Nom)")
+        return woken
 
     def authorize(self, until_ts: float, from_ts: float | None = None) -> str:
         """Patron autorise l'équipe à travailler seule jusqu'à until_ts (à partir de from_ts, ou tout de suite) :
@@ -202,6 +247,7 @@ class Scheduler:
         self.tasks.append(asyncio.create_task(self._mark_prices()))
         self.tasks.append(asyncio.create_task(self._work_watch()))
         self.tasks.append(asyncio.create_task(self._briefings()))
+        self.tasks.append(asyncio.create_task(self._turbo()))
         self.tasks.append(asyncio.create_task(self._followups()))
         self.tasks.append(asyncio.create_task(self._backups()))
         self.tasks.append(asyncio.create_task(mailbox.poll_forever(

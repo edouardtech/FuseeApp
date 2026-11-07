@@ -191,7 +191,10 @@ def build_context(agent: Agent, reason: str) -> str:
     else:
         money_txt = (f"Ce travail en solo s'arrête à {round(budget.autonomous_share() * 100)} % du budget du jour : le "
                      f"reste est gardé pour quand {OWNER} vous parle.")
-    away_txt = ("" if budget.owner_available() else
+    turbo_txt = ("\n🚀 MODE TURBO : l'équipe doit rester active en continu. À chaque cycle, du VRAI travail (outils) "
+                 "et coordonne-toi dans le groupe (@Nom) : dis ce que tu as fait et ce que tu attends des autres. "
+                 "Pas de bavardage vide." if budget.turbo_on() else "")
+    away_txt = turbo_txt + ("" if budget.owner_available() else
                 f"\n🔴 {OWNER} N'EST PAS DISPONIBLE : ne lui envoie AUCUNE demande, question, tâche ni notification "
                 "(elles seraient gardées pour son retour, sans le prévenir). Avance sur tout ce qui ne dépend pas de lui ; "
                 "ce qui ne peut vraiment pas attendre : submit_need (Clara regroupera tout pour son retour). Vice décide "

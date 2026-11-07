@@ -316,6 +316,13 @@ Toutes les équipes travaillent ensemble, avec un seul but : **gagner le plus d'
 
 Plus d'agents = plus de travail, mais aussi plus de dépenses quand ils travaillent seuls (💸 Dépenses de l'IA).
 
+## ⚡ Rythme quand ils travaillent seuls
+
+Bouton 💤 → **⚡ Rythme** : **🐢 Normal** (chacun toutes les 1 h 30 à 6 h, quelques centimes par heure), **🐇 Rapide**
+(toutes les 15 à 60 min, environ 0,20 à 1 € par heure) ou **🚀 Turbo** : au moins **5 agents au travail en même
+temps**, sans pause, qui se coordonnent dans le groupe — plusieurs euros par heure, avec une **pause automatique
+au-delà de 2 € dépensés en 1 heure**. Le rythme ne compte que pendant que tu les laisses travailler seuls.
+
 ## 🤝 Faire, pas promettre
 
 Les agents doivent faire ce que tu demandes **tout de suite**, et ne plus dire « je vais faire » sans le faire :

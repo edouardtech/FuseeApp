@@ -170,6 +170,9 @@ nav#bottom{display:none}
   <button data-w="stop">⏹️ Stop : seulement quand je leur parle</button>
   <div style="border-top:1px solid var(--line);padding-top:8px;display:grid;gap:6px">
     <label style="display:flex;gap:8px;align-items:flex-start"><input type="checkbox" id="wWeb"><span>🌐 <b>Internet, YouTube et navigateur</b> pour se renseigner<br><span class="muted" id="wWebNote">Les recherches internet et YouTube marchent toujours ; ceci autorise aussi le vrai navigateur (ouvrir des pages, captures).</span></span></label>
+    <div>⚡ Rythme quand ils sont seuls :
+      <select id="wPace"><option value="normal">🐢 Normal</option><option value="rapide">🐇 Rapide</option><option value="turbo">🚀 Turbo</option></select>
+      <div class="muted" id="wPaceNote"></div></div>
     <div>💶 Budget : <b id="wBudget">…</b> <button type="button" id="wPerm" style="margin-left:4px">🔐 Autorisations et budget sans limite</button></div>
     <div id="wResAuto" class="muted" hidden></div>
     <div id="wResBox">🛡️ Garder pour moi
@@ -386,7 +389,7 @@ async function poll() {
       $("#workBtn").innerHTML = "♻️<span class=lbl> Redémarrer pour finir la mise à jour</span>";
       $("#workBtn").onclick = () => post("/api/setup/restart").then(() => setTimeout(() => location.reload(), 6000));
     } else {
-      $("#workBtn").innerHTML = r.work.authorized ? `▶️<span class=lbl> Seuls jusqu'à ${esc(r.work.label)}</span>`
+      $("#workBtn").innerHTML = r.work.authorized ? `${r.work.turbo_on ? "🚀" : "▶️"}<span class=lbl> Seuls jusqu'à ${esc(r.work.label)}</span>`
         : r.work.scheduled ? `⏰<span class=lbl> Programmé : ${esc(r.work.range_label)}</span>`
         : "💤<span class=lbl> Attendent que tu parles</span>";
       $("#workBtn").classList.toggle("on", r.work.authorized || !!r.work.scheduled);
@@ -1105,12 +1108,24 @@ $("#workBtn").onclick = e => {
     $("#wWeb").checked = !!S.browser_enabled;
     $("#wBudget").textContent = S.budget && S.budget.unlimited ? "sans limite par jour ∞" : "limité chaque jour";
     $("#wResBox").hidden = !!S.work.unlimited; $("#wResAuto").hidden = !S.work.unlimited;
+    $("#wPace").value = S.work.pace || "normal"; paceNote();
     $("#wResAuto").innerHTML = `🛡️ Sans limite : ils travaillent à fond. Fusée te garde automatiquement <b>${(S.work.reserve_total_eur || 0).toFixed(2).replace(".", ",")} €</b> du budget IA total pour leur parler et vérifier.`;
   }
   $("#workMenu").hidden = !$("#workMenu").hidden;
 };
 $("#wFrom").value = "8"; $("#wTo").value = "17";
 $("#wRes").onchange = () => post("/api/work", {reserve: +$("#wRes").value}).then(poll);
+function paceNote() {
+  const p = $("#wPace").value, w = S.work || {}, e = v => (+v || 0).toFixed(2).replace(".", ",") + " €";
+  $("#wPaceNote").innerHTML = p === "normal" ? "Chacun travaille toutes les 1 h 30 à 6 h : quelques centimes par heure."
+    : p === "rapide" ? "Chacun travaille toutes les 15 à 60 min : environ 0,20 à 1 € par heure."
+    : `Au moins 5 agents au travail en même temps, sans pause : <b>plusieurs euros par heure</b>. Sécurité : pause automatique au-delà de ${e(w.turbo_cap_eur)} dépensés en 1 heure (là : ${e(w.hour_eur)}).`
+      + (S.budget && !S.budget.unlimited ? " ⚠️ Avec le budget limité par jour, il s'arrêtera vite : pense au budget sans limite." : "");
+}
+$("#wPace").onchange = async () => {
+  if ($("#wPace").value === "turbo" && !confirm("🚀 Turbo : au moins 5 agents travaillent en même temps, sans arrêt. Ça peut coûter plusieurs euros par heure (pause automatique au-delà de 2 € par heure). On y va ?")) { $("#wPace").value = (S.work || {}).pace || "normal"; return; }
+  await post("/api/work", {pace: $("#wPace").value}); await poll(); paceNote();
+};
 $("#wWeb").onchange = () => post("/api/browser?on=" + $("#wWeb").checked).then(poll);
 $("#wPerm").onclick = () => {
   $("#workMenu").hidden = true; location.hash = "#settings";

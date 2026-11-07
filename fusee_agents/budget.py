@@ -140,6 +140,31 @@ def range_label(from_ts: float, until_ts: float, now: datetime | None = None) ->
     return f"{when_label(from_ts, now)} → {end}"
 
 
+PACES = ("normal", "rapide", "turbo")
+TURBO_MIN_ACTIVE = 5         # en turbo : au moins 5 agents au travail en même temps
+TURBO_MAX_EUR_PER_HOUR = 2.0  # sécurité : le turbo se met en pause s'il dépense plus que ça en une heure
+
+
+def pace() -> str:
+    p = db.get_setting("pace", "normal")
+    return p if p in PACES else "normal"
+
+
+def spent_last_hour_eur() -> float:
+    import re as _re
+    total = 0.0
+    for r in db.q("SELECT summary FROM activity WHERE kind='cycle' AND ts > ? AND summary LIKE 'fin du cycle%'",
+                  (time.time() - 3600,)):
+        m = _re.search(r"coût ([0-9.]+) \$", r["summary"])
+        total += float(m.group(1)) if m else 0
+    return total * USD_EUR
+
+
+def turbo_on() -> bool:
+    """Turbo actif en ce moment : choisi, pendant le travail en solo, et sous la sécurité par heure."""
+    return pace() == "turbo" and work_authorized() and spent_last_hour_eur() < TURBO_MAX_EUR_PER_HOUR
+
+
 def owner_available() -> bool:
     """🟢 / 🔴 : quand Patron n'est pas disponible, rien ne lui est envoyé (demandes gardées pour son retour)."""
     return db.get_setting("owner_available", "1") == "1"
