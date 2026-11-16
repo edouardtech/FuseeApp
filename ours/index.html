@@ -1395,6 +1395,153 @@ function updateHomeShelf() {
   Object.keys(S.hats).forEach((h, i) => { const m = new T.Mesh(new T.CylinderGeometry(0.3, 0.35, 0.3, 10), lam({ sun: 0x222222, cowboy: 0xa0703a, crown: 0xffc53d, golden: 0xffc53d, noisette: 0x8a5a30, bonnet: 0xd84a3a, explo: 0xd8c08a }[h] || 0xffffff)); m.position.set(-2.6 + i * 1.3, 3.2, 0); homeShelf.add(m); });
 }
 
+// ================= Sculpture : les personnages deviennent tout lisses =================
+// Les boules et les membres de chaque partie du corps sont fondus en une seule forme douce,
+// comme de la pâte à modeler (champ de distance + « surface nets »). Les yeux, les nez brillants,
+// les chapeaux et les petits détails restent à part.
+const sculptMat = new T.MeshToonMaterial({ vertexColors: true, gradientMap: toonGrad });
+const sculptCache = new Map();
+function sculptPrims(group) {
+  const prims = [], used = [];
+  for (const m of group.children) {
+    if (!m.isMesh || m.children.length || !m.geometry || !m.material || !m.material.isMeshToonMaterial || m.material.transparent || m.material.map || m.material === eyeMat || m.material.onBeforeCompile !== T.Material.prototype.onBeforeCompile || m.userData.ink) continue;
+    const gp = m.geometry.parameters || {}, ty = m.geometry.type; m.updateMatrix();
+    const col = m.material.color;
+    if (ty === 'SphereGeometry' && Math.abs((gp.phiLength || 6.2832) - 6.2832) < 0.01 && Math.abs((gp.thetaLength || 3.1416) - 3.1416) < 0.01 && (gp.thetaStart || 0) === 0) {
+      const r = [gp.radius * m.scale.x, gp.radius * m.scale.y, gp.radius * m.scale.z];
+      if (Math.min(r[0], r[1], r[2]) < 0.025 || Math.max(r[0], r[1], r[2]) < 0.045) continue;
+      const inv = new T.Matrix4().compose(m.position, m.quaternion, new T.Vector3(1, 1, 1)).invert();
+      prims.push({ t: 0, e: inv.elements.slice(), r, c: [col.r, col.g, col.b], k: Math.min(0.14, Math.max(0.02, Math.min(r[0], r[1], r[2]) * 0.45)), p: m.position.clone(), R: Math.max(r[0], r[1], r[2]) });
+      used.push(m);
+    } else if (ty === 'BoxGeometry' && Math.min(gp.width * m.scale.x, gp.height * m.scale.y, gp.depth * m.scale.z) >= 0.18) {
+      const hx = gp.width * m.scale.x / 2, hy = gp.height * m.scale.y / 2, hz = gp.depth * m.scale.z / 2, rr = Math.min(hx, hy, hz) * 0.55;
+      const inv = new T.Matrix4().compose(m.position, m.quaternion, new T.Vector3(1, 1, 1)).invert();
+      prims.push({ t: 2, e: inv.elements.slice(), r: [hx, hy, hz], rr, c: [col.r, col.g, col.b], k: Math.min(0.12, Math.max(0.02, rr * 0.5)), p: m.position.clone(), R: Math.hypot(hx, hy, hz), box: 1 });
+      used.push(m);
+    } else if (ty === 'CylinderGeometry' && !gp.openEnded && Math.max(gp.radiusTop, gp.radiusBottom) * m.scale.x >= 0.05 && gp.height * m.scale.y >= 1.2 * Math.max(gp.radiusTop, gp.radiusBottom) * m.scale.x && Math.abs(m.scale.x - m.scale.z) < 0.01) {
+      m.geometry.computeBoundingBox(); const bb = m.geometry.boundingBox;
+      const a = new T.Vector3(0, bb.min.y, 0).applyMatrix4(m.matrix), b = new T.Vector3(0, bb.max.y, 0).applyMatrix4(m.matrix);
+      const ra = gp.radiusBottom * m.scale.x, rb = gp.radiusTop * m.scale.x;
+      prims.push({ t: 1, a, b, ra, rb, c: [col.r, col.g, col.b], k: Math.min(0.12, Math.max(0.02, Math.min(ra, rb) * 0.6)), R: Math.max(ra, rb) });
+      used.push(m);
+    }
+  }
+  return { prims, used };
+}
+function primDist(q, x, y, z) {
+  if (q.t === 2) {
+    const e = q.e, lx = e[0] * x + e[4] * y + e[8] * z + e[12], ly = e[1] * x + e[5] * y + e[9] * z + e[13], lz = e[2] * x + e[6] * y + e[10] * z + e[14];
+    const qx = Math.abs(lx) - q.r[0] + q.rr, qy = Math.abs(ly) - q.r[1] + q.rr, qz = Math.abs(lz) - q.r[2] + q.rr;
+    return Math.hypot(Math.max(qx, 0), Math.max(qy, 0), Math.max(qz, 0)) + Math.min(Math.max(qx, qy, qz), 0) - q.rr;
+  }
+  if (q.t === 0) {
+    const e = q.e, lx = e[0] * x + e[4] * y + e[8] * z + e[12], ly = e[1] * x + e[5] * y + e[9] * z + e[13], lz = e[2] * x + e[6] * y + e[10] * z + e[14];
+    const r = q.r, ax = lx / r[0], ay = ly / r[1], az = lz / r[2], k0 = Math.sqrt(ax * ax + ay * ay + az * az);
+    const bx = ax / r[0], by = ay / r[1], bz = az / r[2], k1 = Math.sqrt(bx * bx + by * by + bz * bz);
+    return k1 < 1e-9 ? -Math.min(r[0], r[1], r[2]) : k0 * (k0 - 1) / k1;
+  }
+  const a = q.a, b = q.b, bax = b.x - a.x, bay = b.y - a.y, baz = b.z - a.z, pax = x - a.x, pay = y - a.y, paz = z - a.z;
+  const h = Math.max(0, Math.min(1, (pax * bax + pay * bay + paz * baz) / (bax * bax + bay * bay + baz * baz || 1)));
+  const dx = pax - bax * h, dy = pay - bay * h, dz = paz - baz * h;
+  return Math.sqrt(dx * dx + dy * dy + dz * dz) - (q.ra + (q.rb - q.ra) * h);
+}
+function sculptSDF(prims, x, y, z) {
+  let d = 1e9;
+  for (const q of prims) { const di = primDist(q, x, y, z), k = q.k, h = Math.max(k - Math.abs(d - di), 0) / k; d = Math.min(d, di) - h * h * k * 0.25; }
+  return d;
+}
+function sculptGeo(prims) {
+  const key = prims.map(q => q.t === 1 ? [q.a.x, q.a.y, q.a.z, q.b.x, q.b.y, q.b.z, q.ra, q.rb, q.c] : [q.t, q.e, q.r, q.c]).flat(3).map(v => Math.round(v * 1000)).join(',');
+  if (sculptCache.has(key)) return sculptCache.get(key);
+  // Boîte autour de la forme
+  const mn = [1e9, 1e9, 1e9], mx = [-1e9, -1e9, -1e9];
+  for (const q of prims) {
+    const pts = q.t === 1 ? [[q.a, q.R], [q.b, q.R]] : [[q.p, q.R]];
+    for (const [p, R] of pts) { const c = [p.x, p.y, p.z]; for (let i = 0; i < 3; i++) { mn[i] = Math.min(mn[i], c[i] - R - 0.06); mx[i] = Math.max(mx[i], c[i] + R + 0.06); } }
+  }
+  const ext = Math.max(mx[0] - mn[0], mx[1] - mn[1], mx[2] - mn[2]);
+  let cs = Math.max(ext / 44, 0.014);
+  const dims = () => [0, 1, 2].map(i => Math.ceil((mx[i] - mn[i]) / cs) + 1);
+  let n = dims(); while (n[0] * n[1] * n[2] > 140000) { cs *= 1.12; n = dims(); }
+  const [nx, ny, nz] = n, f = new Float32Array(nx * ny * nz), id = (i, j, k) => i + nx * (j + ny * k);
+  for (let k = 0; k < nz; k++) for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) f[id(i, j, k)] = sculptSDF(prims, mn[0] + i * cs, mn[1] + j * cs, mn[2] + k * cs);
+  // Un point par case traversée par la surface
+  const vid = new Int32Array((nx - 1) * (ny - 1) * (nz - 1)).fill(-1), cid = (i, j, k) => i + (nx - 1) * (j + (ny - 1) * k);
+  const pos = [], E = [[0, 1], [2, 3], [4, 5], [6, 7], [0, 2], [1, 3], [4, 6], [5, 7], [0, 4], [1, 5], [2, 6], [3, 7]], cv = new Float32Array(8);
+  for (let k = 0; k < nz - 1; k++) for (let j = 0; j < ny - 1; j++) for (let i = 0; i < nx - 1; i++) {
+    let m = 0;
+    for (let c = 0; c < 8; c++) { cv[c] = f[id(i + (c & 1), j + ((c >> 1) & 1), k + ((c >> 2) & 1))]; if (cv[c] < 0) m |= 1 << c; }
+    if (m === 0 || m === 255) continue;
+    let sx = 0, sy = 0, sz = 0, cnt = 0;
+    for (const [a, b] of E) { const va = cv[a], vb = cv[b]; if ((va < 0) === (vb < 0)) continue; const t = va / (va - vb);
+      sx += (a & 1) + ((b & 1) - (a & 1)) * t; sy += ((a >> 1) & 1) + (((b >> 1) & 1) - ((a >> 1) & 1)) * t; sz += ((a >> 2) & 1) + (((b >> 2) & 1) - ((a >> 2) & 1)) * t; cnt++; }
+    vid[cid(i, j, k)] = pos.length / 3;
+    pos.push(mn[0] + (i + sx / cnt) * cs, mn[1] + (j + sy / cnt) * cs, mn[2] + (k + sz / cnt) * cs);
+  }
+  const idx = [];
+  const quad = (a, b, c, d) => { if (a < 0 || b < 0 || c < 0 || d < 0) return; idx.push(a, b, c, a, c, d); };
+  for (let k = 0; k < nz - 1; k++) for (let j = 0; j < ny - 1; j++) for (let i = 0; i < nx - 1; i++) {
+    const s0 = f[id(i, j, k)] < 0;
+    if (j > 0 && k > 0 && s0 !== (f[id(i + 1, j, k)] < 0)) quad(vid[cid(i, j - 1, k - 1)], vid[cid(i, j, k - 1)], vid[cid(i, j, k)], vid[cid(i, j - 1, k)]);
+    if (i > 0 && k > 0 && s0 !== (f[id(i, j + 1, k)] < 0)) quad(vid[cid(i - 1, j, k - 1)], vid[cid(i, j, k - 1)], vid[cid(i, j, k)], vid[cid(i - 1, j, k)]);
+    if (i > 0 && j > 0 && s0 !== (f[id(i, j, k + 1)] < 0)) quad(vid[cid(i - 1, j - 1, k)], vid[cid(i, j - 1, k)], vid[cid(i, j, k)], vid[cid(i - 1, j, k)]);
+  }
+  // Normales lisses (pente du champ) et couleurs mélangées doucement
+  const nv = pos.length / 3, nor = new Float32Array(nv * 3), col = new Float32Array(nv * 3), e = cs * 0.5;
+  for (let v = 0; v < nv; v++) {
+    const x = pos[v * 3], y = pos[v * 3 + 1], z = pos[v * 3 + 2];
+    let gx = sculptSDF(prims, x + e, y, z) - sculptSDF(prims, x - e, y, z), gy = sculptSDF(prims, x, y + e, z) - sculptSDF(prims, x, y - e, z), gz = sculptSDF(prims, x, y, z + e) - sculptSDF(prims, x, y, z - e);
+    const l = Math.hypot(gx, gy, gz) || 1; nor[v * 3] = gx / l; nor[v * 3 + 1] = gy / l; nor[v * 3 + 2] = gz / l;
+    let best = 1e9; const ds = prims.map(q => { const d = primDist(q, x, y, z); if (d < best) best = d; return d; });
+    let r = 0, g = 0, b = 0, w = 0;
+    prims.forEach((q, i) => { const wi = Math.exp(-(ds[i] - best) / 0.012); r += q.c[0] * wi; g += q.c[1] * wi; b += q.c[2] * wi; w += wi; });
+    const fur = 1 + 0.035 * (Math.sin(x * 37 + Math.sin(z * 23) * 2) * Math.sin(y * 41 + Math.sin(x * 19) * 2));
+    col[v * 3] = r / w * fur; col[v * 3 + 1] = g / w * fur; col[v * 3 + 2] = b / w * fur;
+  }
+  // Les faces doivent regarder vers l'extérieur
+  for (let t = 0; t < idx.length; t += 3) {
+    const a = idx[t] * 3, b = idx[t + 1] * 3, c = idx[t + 2] * 3;
+    const ux = pos[b] - pos[a], uy = pos[b + 1] - pos[a + 1], uz = pos[b + 2] - pos[a + 2], wx = pos[c] - pos[a], wy = pos[c + 1] - pos[a + 1], wz = pos[c + 2] - pos[a + 2];
+    const fx = uy * wz - uz * wy, fy = uz * wx - ux * wz, fz = ux * wy - uy * wx;
+    if (fx * (nor[a] + nor[b] + nor[c]) + fy * (nor[a + 1] + nor[b + 1] + nor[c + 1]) + fz * (nor[a + 2] + nor[b + 2] + nor[c + 2]) < 0) { const s = idx[t + 1]; idx[t + 1] = idx[t + 2]; idx[t + 2] = s; }
+  }
+  const geo = new T.BufferGeometry();
+  geo.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); geo.setAttribute('normal', new T.BufferAttribute(nor, 3)); geo.setAttribute('color', new T.BufferAttribute(col, 3));
+  geo.setIndex(idx); geo.computeBoundingSphere();
+  sculptCache.set(key, geo);
+  return geo;
+}
+function sculptGroup(group) {
+  const { prims, used } = sculptPrims(group);
+  if (prims.length < 2 && !(prims.length === 1 && prims[0].box)) return;
+  const geo = sculptGeo(prims);
+  for (const m of used) group.remove(m);
+  const sm = new T.Mesh(geo, sculptMat); sm.castShadow = true; sm.userData.sculpt = 1; group.add(sm);
+  // Les yeux et leurs reflets ressortent bien de la nouvelle forme
+  const eyes = group.children.filter(o => o.isMesh && o.material === eyeMat && o.geometry.type === 'SphereGeometry');
+  const moved = [];
+  for (const o of eyes) {
+    const r = o.geometry.parameters.radius * Math.max(o.scale.x, o.scale.y, o.scale.z), p = o.position, d = sculptSDF(prims, p.x, p.y, p.z);
+    if (d > -r * 0.35) continue;
+    const e = 0.004, g = new T.Vector3(sculptSDF(prims, p.x + e, p.y, p.z) - sculptSDF(prims, p.x - e, p.y, p.z), sculptSDF(prims, p.x, p.y + e, p.z) - sculptSDF(prims, p.x, p.y - e, p.z), sculptSDF(prims, p.x, p.y, p.z + e) - sculptSDF(prims, p.x, p.y, p.z - e)).normalize();
+    const delta = g.multiplyScalar(-d - r * 0.35); moved.push([p.clone(), delta]); p.add(delta);
+  }
+  for (const o of group.children) if (o.isMesh && o.material && o.material.isMeshBasicMaterial && moved.length) {
+    let bd = 0.12, bm = null; for (const [p0, dl] of moved) { const d = p0.distanceTo(o.position); if (d < bd) { bd = d; bm = dl; } }
+    if (bm) o.position.add(bm);
+  }
+}
+function smoothChar(root) {
+  if (!root || !root.isObject3D || root.userData.smoothed) return;
+  let rig = false, bad = false;
+  root.traverse(o => { if (o.userData && o.userData.rig) rig = true; if (o.userData && o.userData.ink) bad = true; if (o.isMesh && o.material && o.material.onBeforeCompile !== T.Material.prototype.onBeforeCompile) bad = true; });
+  root.userData.smoothed = 1;
+  if (!rig || bad) return;
+  const walk = o => { if (!o.isMesh) sculptGroup(o); for (const c of o.children.slice()) if (!c.isMesh || c.children.length) walk(c); };
+  walk(root);
+}
+{ const add0 = scene.add.bind(scene); scene.add = (...a) => { if (!window.__noSculpt) for (const o of a) smoothChar(o); return add0(...a); }; }
+
 // ================= Personnages =================
 // Chaque personnage est un groupe tourné vers +Z, avec des membres articulés (rig) pour l'animation.
 function limb(parent, mat, r, len, x, y, z) {
@@ -9555,6 +9702,7 @@ function frame(now) {
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
   if (OPT.quality === 0 && !window.__noAdapt) { if (dt > 0.03) slowAcc += dt; else slowAcc = Math.max(0, slowAcc - dt * 0.3); if (slowAcc > 2.5 && dpr > 0.6) { dpr = Math.max(0.6, dpr - 0.2); slowAcc = 0; resize(); } }
   step(dt);
+  if (window.__cam) window.__cam(camera);
   ptMat.uniforms.uScale.value = renderer.domElement.height / (2 * Math.tan(camera.fov * Math.PI / 360));
   renderer.render(scene, camera);
   drawOverlay();
