@@ -1,0 +1,16 @@
+{
+  "name": "Fusée Kármán",
+  "short_name": "Fusée Kármán",
+  "description": "Pilote une vraie fusée : traverse l'atmosphère, rejoins la Station spatiale et pose-toi sur la Lune.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "any",
+  "background_color": "#0a1028",
+  "theme_color": "#0a1028",
+  "lang": "fr",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

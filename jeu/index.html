@@ -4,6 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Fusée Kármán</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0a1028">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Fusée Kármán">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Saira+Stencil+One&family=Chakra+Petch:wght@400;500;600;700&display=swap">
@@ -191,7 +198,9 @@ body { background: #02040a; color: var(--ink); font-family: var(--hud); overflow
       <button class="go" id="startBtn" type="button">Lancer la mission</button>
       <button class="ghost" id="fsBtn" type="button">Plein écran</button>
       <button class="ghost" id="langBtn" type="button">🇬🇧 English</button>
+      <button class="ghost" id="installBtn" type="button" hidden>📲 Installer l'appli</button>
     </div>
+    <div id="installTip" hidden style="margin-top:10px;font-size:14px;line-height:1.4;color:var(--muted)"></div>
   </div>
 </div>
 
@@ -3238,6 +3247,28 @@ addEventListener('resize', resize);
 resize();
 setSite(siteIdx);
 requestAnimationFrame(frame);
+})();
+</script>
+<script>
+// Installer le jeu comme une appli (icône sur l'écran, et jeu sans wifi)
+(() => {
+  const EN = (() => { try { const l = localStorage.getItem('fusee-lang'); if (l) return l === 'en'; } catch (e) {} return !/^fr/i.test(navigator.language || 'fr'); })();
+  const b = document.getElementById('installBtn'), tip = document.getElementById('installTip'); if (!b) return;
+  let ask = null;
+  const standalone = matchMedia('(display-mode: fullscreen), (display-mode: standalone)').matches || navigator.standalone;
+  const ios = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  b.textContent = EN ? '📲 Install the app' : '📲 Installer l\'appli';
+  if (!standalone && /^https?:$/.test(location.protocol)) {
+    addEventListener('beforeinstallprompt', e => { e.preventDefault(); ask = e; b.hidden = false; });
+    if (ios) b.hidden = false;
+    if ('serviceWorker' in navigator) addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+  }
+  b.addEventListener('click', async () => {
+    if (ask) { ask.prompt(); const r = await ask.userChoice; if (r.outcome === 'accepted') b.hidden = true; ask = null; return; }
+    tip.hidden = !tip.hidden;
+    tip.textContent = EN ? 'In Safari, tap the Share button (square with an arrow), then "Add to Home Screen". The game will then work without wifi!' : 'Dans Safari, touche le bouton Partager (le carré avec une flèche), puis « Sur l\'écran d\'accueil ». Ensuite, le jeu marche même sans wifi !';
+  });
+  addEventListener('appinstalled', () => { b.hidden = true; tip.hidden = true; });
 })();
 </script>
 </body>
