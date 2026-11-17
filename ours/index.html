@@ -874,13 +874,13 @@ function buildPlants() {
   const mergeVC = list => { const parts = list.map(g => g.index ? g.toNonIndexed() : g); let n = 0; for (const g of parts) n += g.attributes.position.count; const pos = new Float32Array(n * 3), nor = new Float32Array(n * 3), cl = new Float32Array(n * 3); let o = 0; for (const g of parts) { pos.set(g.attributes.position.array, o * 3); nor.set(g.attributes.normal.array, o * 3); cl.set(g.attributes.color.array, o * 3); o += g.attributes.position.count; } const r = new T.BufferGeometry(); r.setAttribute('position', new T.BufferAttribute(pos, 3)); r.setAttribute('normal', new T.BufferAttribute(nor, 3)); r.setAttribute('color', new T.BufferAttribute(cl, 3)); return r; };
   const folGeo = mergeVC(fol), capGeo = mergeGeos(caps);
   const trunkGeo = new T.CylinderGeometry(0.22, 0.32, 2.4, 6); trunkGeo.translate(0, 1.2, 0);
-  const roundGeo = aoGeo(new T.IcosahedronGeometry(2.4, 1).translate(0, 4.4, 0), 0.6);
+  const roundGeo = aoGeo(blobGeo([[0, 4.3, 0, 1.75], [1.25, 3.9, 0.3, 1.2], [-1.15, 4.0, 0.5, 1.25], [0.2, 3.8, -1.2, 1.2], [-0.4, 3.7, 1.25, 1.1], [0.6, 5.3, 0.3, 1.25], [-0.7, 5.0, -0.5, 1.15], [0.1, 6.1, 0, 0.9]], 15), 0.5);
   // Séquoia géant de la grande forêt
   const sq = [[new T.CylinderGeometry(0.8, 1.4, 14, 8).translate(0, 7, 0), 0x9a3f3a]];
   for (let i = 0; i < 5; i++) sq.push([new T.ConeGeometry(4.4 - i * 0.7, 3.6, 10).rotateY(i).translate(0, 10 + i * 2.4, 0), [0x2a6a44, 0x2f7448, 0x2a6a44, 0x347a4c, 0x2f7448][i]]);
   const seqGeo = aoGeo(mergeCol(sq), 0.7);
   // Bouleau : tronc blanc et feuillage clair
-  const birchGeo = aoGeo(mergeCol([[new T.CylinderGeometry(0.16, 0.24, 5, 6).translate(0, 2.5, 0), 0xf2eee6], [new T.CylinderGeometry(0.245, 0.245, 0.18, 6).translate(0, 1.6, 0), 0x2c2630], [new T.CylinderGeometry(0.2, 0.2, 0.15, 6).translate(0, 3.1, 0), 0x2c2630], [new T.IcosahedronGeometry(1.7, 1).translate(0.3, 5.6, 0), 0x9ccf5a], [new T.IcosahedronGeometry(1.3, 1).translate(-0.7, 6.5, 0.4), 0xb2d866]]), 0.72);
+  const birchGeo = aoGeo(mergeCol([[new T.CylinderGeometry(0.16, 0.24, 5, 6).translate(0, 2.5, 0), 0xf2eee6], [new T.CylinderGeometry(0.245, 0.245, 0.18, 6).translate(0, 1.6, 0), 0x2c2630], [new T.CylinderGeometry(0.2, 0.2, 0.15, 6).translate(0, 3.1, 0), 0x2c2630], [blobGeo([[0.3, 5.5, 0, 1.3], [-0.6, 6.3, 0.4, 1.05], [0.9, 6.0, -0.4, 0.9], [-0.2, 4.9, -0.7, 0.85], [0.1, 7.0, 0, 0.7]], 13), 0xa4d35e]]), 0.6);
   const pines = [], rounds = [], snowP = [], seqs = [], birches = [];
   for (let t = 0; t < 420000 && pines.length + rounds.length + seqs.length + birches.length < 21000; t++) {
     const x = srange(-HALF, HALF), z = srange(-HALF, HALF);
@@ -905,7 +905,7 @@ function buildPlants() {
   // Buissons pour se cacher, et buissons à baies
   const bushGeo = new T.IcosahedronGeometry(1, 1);
   { const p = bushGeo.attributes.position; for (let v = 0; v < p.count; v++) { const x = p.getX(v), y = p.getY(v), z = p.getZ(v); const k = hash2(Math.round(x * 50) + 7, Math.round(y * 50) * 31 + Math.round(z * 50)) > 0.5 ? 1.16 : 0.94; p.setXYZ(v, x * k, y * k, z * k); } bushGeo.computeVertexNormals(); }
-  const bush2 = aoGeo(mergeGeos([bushGeo.clone(), bushGeo.clone().scale(0.7, 0.7, 0.7).translate(0.75, -0.2, 0.35), bushGeo.clone().scale(0.6, 0.6, 0.6).translate(-0.7, -0.25, -0.3)]), 0.6), bushA = aoGeo(bushGeo.clone(), 0.6);
+  const bush2 = aoGeo(blobGeo([[0, 0, 0, 0.85], [0.75, -0.2, 0.35, 0.62], [-0.7, -0.25, -0.3, 0.55], [0.15, 0.45, -0.1, 0.55], [-0.2, -0.3, 0.6, 0.45]], 12), 0.55), bushA = aoGeo(blobGeo([[0, 0, 0, 0.8], [0.45, 0.2, 0.2, 0.5], [-0.4, 0.15, -0.25, 0.5], [0.05, 0.5, 0, 0.45], [-0.15, -0.1, 0.5, 0.45], [0.3, -0.15, -0.45, 0.42]], 12), 0.55);
   const bl = [];
   for (let t = 0; t < 40000 && bl.length < 820; t++) {
     const x = srange(-HALF, HALF), z = srange(-HALF, HALF);
@@ -1450,8 +1450,9 @@ function sculptSDF(prims, x, y, z) {
   for (const q of prims) { const di = primDist(q, x, y, z), k = q.k, h = Math.max(k - Math.abs(d - di), 0) / k; d = Math.min(d, di) - h * h * k * 0.25; }
   return d;
 }
-function sculptGeo(prims) {
-  const key = prims.map(q => q.t === 1 ? [q.a.x, q.a.y, q.a.z, q.b.x, q.b.y, q.b.z, q.ra, q.rb, q.c] : [q.t, q.e, q.r, q.c]).flat(3).map(v => Math.round(v * 1000)).join(',');
+function sculptGeo(prims, o) {
+  o = o || {}; const RES = o.res || 44, FUR = o.fur !== false;
+  const key = RES + ':' + prims.map(q => q.t === 1 ? [q.a.x, q.a.y, q.a.z, q.b.x, q.b.y, q.b.z, q.ra, q.rb, q.c] : [q.t, q.e, q.r, q.c]).flat(3).map(v => Math.round(v * 1000)).join(',');
   if (sculptCache.has(key)) return sculptCache.get(key);
   // Boîte autour de la forme
   const mn = [1e9, 1e9, 1e9], mx = [-1e9, -1e9, -1e9];
@@ -1460,7 +1461,7 @@ function sculptGeo(prims) {
     for (const [p, R] of pts) { const c = [p.x, p.y, p.z]; for (let i = 0; i < 3; i++) { mn[i] = Math.min(mn[i], c[i] - R - 0.06); mx[i] = Math.max(mx[i], c[i] + R + 0.06); } }
   }
   const ext = Math.max(mx[0] - mn[0], mx[1] - mn[1], mx[2] - mn[2]);
-  let cs = Math.max(ext / 44, 0.014);
+  let cs = Math.max(ext / RES, 0.014);
   const dims = () => [0, 1, 2].map(i => Math.ceil((mx[i] - mn[i]) / cs) + 1);
   let n = dims(); while (n[0] * n[1] * n[2] > 140000) { cs *= 1.12; n = dims(); }
   const [nx, ny, nz] = n, f = new Float32Array(nx * ny * nz), id = (i, j, k) => i + nx * (j + ny * k);
@@ -1495,7 +1496,7 @@ function sculptGeo(prims) {
     let best = 1e9; const ds = prims.map(q => { const d = primDist(q, x, y, z); if (d < best) best = d; return d; });
     let r = 0, g = 0, b = 0, w = 0;
     prims.forEach((q, i) => { const wi = Math.exp(-(ds[i] - best) / 0.012); r += q.c[0] * wi; g += q.c[1] * wi; b += q.c[2] * wi; w += wi; });
-    const fur = 1 + 0.035 * (Math.sin(x * 37 + Math.sin(z * 23) * 2) * Math.sin(y * 41 + Math.sin(x * 19) * 2));
+    const fur = !FUR ? 1 : 1 + 0.035 * (Math.sin(x * 37 + Math.sin(z * 23) * 2) * Math.sin(y * 41 + Math.sin(x * 19) * 2));
     col[v * 3] = r / w * fur; col[v * 3 + 1] = g / w * fur; col[v * 3 + 2] = b / w * fur;
   }
   // Les faces doivent regarder vers l'extérieur
@@ -1510,6 +1511,12 @@ function sculptGeo(prims) {
   geo.setIndex(idx); geo.computeBoundingSphere();
   sculptCache.set(key, geo);
   return geo;
+}
+// Une forme toute ronde faite de plusieurs boules fondues (feuillages, buissons)
+function blobGeo(balls, res) {
+  const I = new T.Matrix4().elements;
+  const prims = balls.map(([x, y, z, r, sy]) => { const inv = new T.Matrix4().makeTranslation(-x, -y, -z).elements; return { t: 0, e: inv.slice(), r: [r, r * (sy || 1), r], c: [1, 1, 1], k: r * 0.55, p: new T.Vector3(x, y, z), R: r }; });
+  return sculptGeo(prims, { res, fur: false }).clone();
 }
 function sculptGroup(group) {
   const { prims, used } = sculptPrims(group);
