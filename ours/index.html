@@ -947,13 +947,13 @@ function buildPlants() {
     bushes.push(b);
     if (b.berries) { berryBushes.push(b); for (let k = 0; k < 7; k++) { const a = k * 0.9 + e[4], h = srange(-0.3, 0.5); berryPos.push([e[0] + Math.cos(a) * e[3] * 0.92, e[1] + h * e[3], e[2] + Math.sin(a) * e[3] * 0.92, b]); } }
   });
-  const berryGeo = new T.IcosahedronGeometry(0.16, 0);
+  const berryGeo = new T.SphereGeometry(0.16, 8, 6);
   const berries = new T.InstancedMesh(berryGeo, M.berry, berryPos.length);
   berryPos.forEach((p, i) => { m4.makeTranslation(p[0], p[1], p[2]); berries.setMatrixAt(i, m4); p[3].dots.push(i); });
   berries.frustumCulled = false; scene.add(berries);
   berryInst = berries; berryMatrix = berryPos;
   // Rochers et fleurs
-  const rockGeo = new T.DodecahedronGeometry(1, 0);
+  const rockGeo = aoGeo(blobGeo([[0, 0, 0, 0.85, 0.75], [0.45, -0.1, 0.25, 0.6, 0.7], [-0.4, -0.15, -0.2, 0.55, 0.7], [0.05, 0.3, -0.1, 0.5, 0.8]], 10), 0.7);
   const rocks = [];
   for (let t = 0; t < 12000 && rocks.length < 430; t++) {
     const x = srange(-HALF, HALF), z = srange(-HALF, HALF);
@@ -964,7 +964,7 @@ function buildPlants() {
     rocks.push([x, groundY(x, z) + s * 0.2, z, s, srand() * 6]);
     if (s > 0.9) addCircle(x, z, s * 0.8);
   }
-  tiledInst(rockGeo, lam(0xffffff), rocks, { h: 2, col: (c, i, e) => c.set(REG.canyon(e[0], e[2]) > 0.5 ? 0xc0704a : isSnowy(e[0], e[2], e[1]) ? 0xb8bccc : 0x9d93b5).convertSRGBToLinear() });
+  tiledInst(rockGeo, lam(0xffffff, { vertexColors: true }), rocks, { h: 2, col: (c, i, e) => c.set(REG.canyon(e[0], e[2]) > 0.5 ? 0xc0704a : isSnowy(e[0], e[2], e[1]) ? 0xb8bccc : 0x9d93b5).convertSRGBToLinear() });
   // Fleurs : une tige, une corolle à 5 pétales et un cœur jaune, en petits massifs de la même couleur
   const pet = new T.CircleGeometry(0.17, 10); { const pp = pet.attributes.position; for (let v = 1; v < pp.count; v++) { const k = (v - 1) % 2 ? 0.42 : 1; pp.setXYZ(v, pp.getX(v) * k, pp.getY(v) * k, k > 0.5 ? 0.05 : 0.01); } }
   pet.rotateX(-Math.PI / 2); pet.translate(0, 0.46, 0); pet.computeVertexNormals();

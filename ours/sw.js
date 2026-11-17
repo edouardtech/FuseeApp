@@ -1,6 +1,6 @@
 // Garde le jeu dans le téléphone pour pouvoir jouer sans wifi.
 // Change VERSION à chaque nouvelle version du jeu pour que tout le monde la reçoive.
-const VERSION = 'ours-malin-2026-11-17';
+const VERSION = 'ours-malin-2026-11-17b';
 const FILES = ['./', './index.html', './three.min.js', './manifest.webmanifest', './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(VERSION).then(c => c.addAll(FILES)).then(() => self.skipWaiting()));
