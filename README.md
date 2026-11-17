@@ -128,6 +128,8 @@ Aventure 3D en 8 chapitres (et ce n'est pas fini), tout en douceur, dans le parc
   - cueille 3 glaçons chantants (Do, Mi, Sol) dans la grotte de glace ;
   - rallume la Lanterne du Sud en haut de l'île : les aurores australes reviennent danser dans le ciel.
   Givre lui donne son écharpe, et tout le monde rentre au parc des Pins.
+- Personnages sculptés : les corps d'Oscar et de tous les animaux sont fondus en une seule forme lisse, comme de la pâte à modeler, au lieu de boules collées. Les arbres ronds, les bouleaux et les buissons ont un feuillage tout doux.
+- Appli : sur téléphone, le bouton « Installer l'appli » de l'écran titre (ou « Sur l'écran d'accueil » dans Safari) met une icône d'ours sur l'écran. Après une première ouverture avec internet, le jeu marche sans wifi.
 - La Forêt Immense : arbres géants et séquoias de plus de 30 mètres, lianes, racines, rivière avec des ponts en troncs, lac des Brumes, ruines anciennes, champignons géants et petits champignons qui brillent la nuit, arbres à lanternes, rayons de soleil entre les arbres, brume qui flotte, lucioles, cerfs et lapins. La caméra passe sous les grands arbres.
 - Oscar a du caractère : c'est un ours un peu bête, très drôle et têtu. Il est gourmand, il se croit le plus malin et il ne veut jamais avoir tort. Il pense tout haut dans une petite bulle : quand il reste sans bouger, quand il fonce dans un arbre (il insiste !), quand il nage, court, mange des baies, se promène la nuit, dans la forêt ou sur la Lune.
 - Encore plus de nature :
