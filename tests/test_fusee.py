@@ -200,7 +200,7 @@ def test_qr_code_for_iphone(monkeypatch):
     monkeypatch.setattr(web.setup_mod, "_read", lambda: {"DASHBOARD_URL": "https://mac.tail1.ts.net"})
     r = c.get("/api/qr")
     assert r.status_code == 200 and r.headers["content-type"].startswith("image/svg+xml") and b"<svg" in r.content
-    assert c.get("/api/device_url").json() == {"url": "https://mac.tail1.ts.net"}
+    assert c.get("/api/device_url").json()["url"] == "https://mac.tail1.ts.net"
     assert TestClient(web.public_app).get("/api/qr").status_code == 404  # jamais sur le serveur public
 
 
@@ -1117,3 +1117,46 @@ def test_raising_the_budget_restarts_the_team(monkeypatch):
     s = c.get("/api/state").json()["budget"]
     assert "total_exhausted" in s and "today_exhausted" in s
     budget.stop_work()
+
+
+def test_iphone_on_home_wifi_without_installing_anything(monkeypatch):
+    """📶 Fusée s'ouvre au Wi-Fi de la maison (Safari sur l'iPhone, rien à installer), toujours avec un mot de passe."""
+    import base64
+    from fastapi.testclient import TestClient
+    from fusee_agents import web
+    saved, restarts = {}, []
+    monkeypatch.setattr(web.setup_mod, "save", lambda v: saved.update(v) or list(v))
+    monkeypatch.setattr(web.setup_mod, "restart", lambda: restarts.append(1))
+    monkeypatch.setattr(web.setup_mod, "_read", lambda: {})
+    monkeypatch.setattr(web, "_local_ip", lambda: "192.168.1.23")
+    mac, phone = TestClient(web.app, client=("127.0.0.1", 5000)), TestClient(web.app, client=("192.168.1.40", 5000))
+    # Fermé par défaut : pas d'adresse Wi-Fi ni de QR code
+    monkeypatch.setenv("HOST", "127.0.0.1")
+    monkeypatch.setattr(web, "PASSWORD", "")
+    d = mac.get("/api/device_url").json()
+    assert d["lan_url"] == "" and d["on_mac"] is True and d["wifi_on"] is False
+    assert mac.get("/api/qr?for=lan").status_code == 404
+    # Seulement depuis le Mac, et avec un vrai mot de passe
+    assert phone.post("/api/wifi", json={"on": True, "password": "fusee123"}).status_code == 403
+    assert mac.post("/api/wifi", json={"on": True, "password": "abc"}).status_code == 400
+    assert mac.post("/api/wifi", json={"on": True, "password": "fusee123"}).status_code == 200
+    assert saved == {"HOST": "0.0.0.0", "DASHBOARD_PASSWORD": "fusee123"}
+    # Après le redémarrage : l'iPhone a besoin du mot de passe, le Mac non
+    monkeypatch.setenv("HOST", "0.0.0.0")
+    monkeypatch.setattr(web, "PASSWORD", "fusee123")
+    assert mac.get("/api/device_url").json()["lan_url"] == f"http://192.168.1.23:{web.PORT}"
+    assert mac.get("/api/qr?for=lan").headers["content-type"].startswith("image/svg+xml")
+    assert phone.get("/api/state").status_code == 401
+    good = {"authorization": "Basic " + base64.b64encode(b"moi:fusee123").decode()}
+    assert phone.get("/api/device_url", headers=good).status_code == 200
+    # Relayé par un serveur intermédiaire (ex. Tailscale) : ce n'est plus « le Mac lui-même »
+    assert mac.get("/api/state", headers={"x-forwarded-for": "1.2.3.4"}).status_code == 401
+    # Trop de mots de passe faux : l'appareil attend 15 minutes
+    web._pwd_fails.clear()
+    bad = {"authorization": "Basic " + base64.b64encode(b"moi:mauvais").decode()}
+    for _ in range(web.PWD_MAX_FAILS):
+        assert phone.get("/api/state", headers=bad).status_code == 401
+    assert phone.get("/api/state", headers=good).status_code == 429
+    web._pwd_fails.clear()
+    # Fermer
+    assert mac.post("/api/wifi", json={"on": False}).status_code == 200 and saved["HOST"] == "127.0.0.1"

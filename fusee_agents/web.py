@@ -19,7 +19,7 @@ from . import analytics, briefing, budget, db, delegation, integrations, knowled
 from . import setup as setup_mod
 from .agents import (BY_NAME, OWNER, PROFILE_LABELS, TEAM, add_agent, agent_settings, make_custom, owner_profile,
                      save_team_config, team_config)
-from .config import PLAN, PUBLIC_URL, USD_EUR, WORKSPACE, model_for
+from .config import PLAN, PORT, PUBLIC_URL, USD_EUR, WORKSPACE, model_for
 from . import notify as notify_mod
 from .notify import notify
 from .scheduler import scheduler
@@ -90,14 +90,37 @@ async def guard(request: Request, call_next):
         return resp
     tailnet_user = (request.headers.get("tailscale-user-login") and request.client is not None
                     and request.client.host in ("127.0.0.1", "::1"))  # passé par « tailscale serve » (privé)
-    if PASSWORD and not tailnet_user:
+    if PASSWORD and not tailnet_user and not _on_this_mac(request):
+        who = request.client.host if request.client else "?"
+        now = time.time()
+        fails = _pwd_fails[who]
+        while fails and now - fails[0] > PWD_LOCK_S:
+            fails.popleft()
+        if len(fails) >= PWD_MAX_FAILS:  # trop d'essais depuis cet appareil : on attend
+            return Response("Trop de mots de passe faux : réessaie dans 15 minutes.", status_code=429)
         try:
             _, pwd = base64.b64decode(request.headers.get("authorization", "")[6:]).decode().split(":", 1)
         except Exception:  # noqa: BLE001
             pwd = ""
         if not secrets.compare_digest(pwd.encode(), PASSWORD.encode()):
+            if pwd:
+                fails.append(now)
             return Response(status_code=401, headers={"WWW-Authenticate": 'Basic realm="Fusee"'})
     return await call_next(request)
+
+
+PWD_MAX_FAILS, PWD_LOCK_S = 10, 15 * 60
+_pwd_fails: defaultdict[str, deque] = defaultdict(deque)
+LOOPBACK = ("127.0.0.1", "::1", "localhost")
+
+
+def _on_this_mac(request: Request) -> bool:
+    """La demande vient directement du Mac qui fait tourner Fusée (pas d'un autre appareil, ni relayée par un
+    serveur intermédiaire comme Tailscale) : pas besoin de mot de passe, c'est l'ordinateur de Patron."""
+    if request.client is None or request.client.host not in LOOPBACK:
+        return False
+    return not any(h in request.headers for h in ("x-forwarded-for", "forwarded", "x-real-ip",
+                                                   "tailscale-user-login"))
 
 
 # --- application (PWA) ------------------------------------------------------
@@ -1331,6 +1354,10 @@ def qr_code(target: str = Query("fusee", alias="for")):
     import qrcode.image.svg
     if target == "tailscale":
         url = TAILSCALE_DOWNLOAD
+    elif target == "lan":
+        url = lan_url()
+        if not url:
+            raise HTTPException(404, "Fusée n'est pas encore ouverte au Wi-Fi de la maison")
     else:
         url = setup_mod._read().get("DASHBOARD_URL", os.getenv("DASHBOARD_URL", "")).strip()
         if not url.startswith("https://"):
@@ -1340,6 +1367,54 @@ def qr_code(target: str = Query("fusee", alias="for")):
     return Response(buf.getvalue(), media_type="image/svg+xml")
 
 
+def _local_ip() -> str:
+    """L'adresse du Mac sur le Wi-Fi de la maison (ex. 192.168.1.23). Aucun paquet n'est envoyé."""
+    import socket
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.connect(("192.0.2.1", 80))  # adresse de test : seulement pour connaître la bonne carte réseau
+            ip = s.getsockname()[0]
+    except OSError:
+        return ""
+    return "" if ip.startswith("127.") or ip == "0.0.0.0" else ip
+
+
+def wifi_on() -> bool:
+    """Fusée est-elle ouverte aux autres appareils du Wi-Fi (et protégée par un mot de passe) ?"""
+    return os.getenv("HOST", "127.0.0.1").strip() not in ("", *LOOPBACK) and bool(PASSWORD)
+
+
+def lan_url() -> str:
+    ip = _local_ip() if wifi_on() else ""
+    return f"http://{ip}:{PORT}" if ip else ""
+
+
 @app.get("/api/device_url")
-def device_url():
-    return {"url": setup_mod._read().get("DASHBOARD_URL", os.getenv("DASHBOARD_URL", "")).strip()}
+def device_url(request: Request):
+    return {"url": setup_mod._read().get("DASHBOARD_URL", os.getenv("DASHBOARD_URL", "")).strip(),
+            "lan_url": lan_url(), "wifi_on": wifi_on(), "on_mac": _on_this_mac(request),
+            "wifi_saved": setup_mod._read().get("HOST", "").strip() not in ("", *LOOPBACK)}
+
+
+class Wifi(BaseModel):
+    on: bool
+    password: str = ""
+
+
+@app.post("/api/wifi")
+async def wifi(body: Wifi, request: Request):
+    """📶 Ouvre (ou ferme) Fusée aux autres appareils du Wi-Fi de la maison : iPhone et iPad l'ouvrent dans Safari,
+    sans rien installer. Un mot de passe est obligatoire. Seulement depuis le Mac lui-même."""
+    if not _on_this_mac(request):
+        raise HTTPException(403, "Fais-le depuis le Mac qui fait tourner Fusée.")
+    if body.on:
+        pwd = body.password.strip()
+        if len(pwd) < 6:
+            raise HTTPException(400, "Choisis un mot de passe d'au moins 6 caractères.")
+        if parent.is_set() and parent.appears_in(pwd):
+            raise HTTPException(400, "Pas le code parent : choisis un autre mot de passe.")
+        setup_mod.save({"HOST": "0.0.0.0", "DASHBOARD_PASSWORD": pwd})
+    else:
+        setup_mod.save({"HOST": "127.0.0.1"})
+    asyncio.get_running_loop().call_later(1.0, setup_mod.restart)  # le nouveau réglage s'applique au redémarrage
+    return {"ok": True}

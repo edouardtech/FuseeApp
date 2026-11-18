@@ -191,7 +191,18 @@ Le fichier `LISEZ-MOI.txt` sur la clé explique comment remettre la sauvegarde.
 ### 📲 Installer l'application
 
 - **Ordinateur** (Chrome/Edge) : bouton « 📲 Installer l'app » en haut, ou l'icône dans la barre d'adresse.
-- **📱 iPhone et iPad (recommandé), rien que pour toi, partout (même en 4G)** :
+- **📶 iPhone et iPad à la maison — rien à installer** (seulement Safari) :
+  1. sur le Mac, dans Fusée : ⚙️ Réglages → **📱 Fusée sur ton iPhone** → choisis un **mot de passe** →
+     **« 📶 Ouvrir Fusée au Wi-Fi de la maison »** (Fusée redémarre quelques secondes ; si le Mac demande
+     « accepter les connexions entrantes ? », touche **Autoriser**) ;
+  2. un **QR code** apparaît : sur l'iPhone (même Wi-Fi), vise-le avec l'**Appareil photo** → touche le lien →
+     écris le mot de passe → **Partager** → **Sur l'écran d'accueil** → Ajouter.
+
+  Marche seulement sur le Wi-Fi de la maison, quand le Mac est allumé, et sans notifications sur l'iPhone (il faut
+  une adresse https pour ça : voir Tailscale ci-dessous). Le mot de passe est **obligatoire** (sans lui, Fusée reste
+  fermée à ce Mac) ; après 10 essais faux, l'appareil doit attendre 15 minutes. Le Mac lui-même n'a pas besoin du
+  mot de passe. Pour refermer : même carte → « Fermer Fusée au Wi-Fi ».
+- **📱 iPhone et iPad partout (même en 4G), avec notifications** — il faut l'app gratuite Tailscale :
   1. installe **Tailscale** (gratuit) sur ton Mac (https://tailscale.com/download/mac), ton iPhone et ton iPad
      (App Store), connecte-toi avec **le même compte** partout ;
   2. sur le Mac, dans le dossier Fusee : double-clique **« Activer iPhone et iPad »** (ou `./activer-iphone.sh`) →

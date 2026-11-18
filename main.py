@@ -18,6 +18,12 @@ if __name__ == "__main__":
     # Par défaut, Fusée n'est accessible que depuis ce Mac (HOST=127.0.0.1).
     # HOST=0.0.0.0 l'ouvre aux autres appareils du Wi-Fi (téléphone) : mets alors un mot de passe d'appli.
     host = os.getenv("HOST", "127.0.0.1").strip() or "127.0.0.1"
+    if host not in ("127.0.0.1", "::1", "localhost") and not os.getenv("DASHBOARD_PASSWORD", "").strip():
+        print("🔒 HOST ouvre Fusée aux autres appareils, mais il n'y a pas de mot de passe : Fusée reste fermée à "
+              "ce Mac. Mets un mot de passe (⚙️ Réglages → 📱 Fusée sur ton iPhone).", file=sys.stderr)
+        host = "127.0.0.1"
+    elif host != "127.0.0.1":
+        print(f"📶 Fusée est aussi ouverte aux appareils du Wi-Fi (port {PORT}), avec mot de passe.")
     # Second petit serveur, uniquement pour le public (chat des sites, statistiques, désinscription) :
     # c'est LUI, et lui seul, qu'on expose sur internet (tailscale funnel). L'appli reste privée.
     public_port = int(os.getenv("PUBLIC_PORT", "8001"))

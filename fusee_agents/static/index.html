@@ -982,24 +982,67 @@ async function renderCostBox() {
 
 async function renderDeviceBox() {
   const box = $("#devBox"); if (!box) return;
-  const {url} = await api("/api/device_url");
-  if (!url) {
-    box.innerHTML = `<div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin-bottom:8px">
-      <img src="/api/qr?for=tailscale" alt="QR code Tailscale" style="width:130px;height:130px;background:#fff;border-radius:12px;padding:6px">
-      <div style="flex:1;min-width:200px;color:var(--text)"><b>D'abord, installe Tailscale sur ton iPhone et ton iPad :</b><br>
-      ouvre l'<b>Appareil photo</b>, vise ce QR code → touche le lien → <b>App Store</b> → Obtenir.<br>
-      <span class="muted">(Ce n'est pas encore le QR code de Fusée : celui-là apparaîtra ici après l'étape 2.)</span></div></div>
-      1. Installe l'app gratuite <b>Tailscale</b> sur ce Mac, ton iPhone et ton iPad, et connecte-toi <b>avec le même compte</b> sur les trois.<br>
-      2. Sur le Mac, dans le dossier Fusee, double-clique sur <b>« Activer iPhone et iPad »</b>.<br>3. Reviens ici : <b>le QR code apparaîtra à cette place</b>.
-      <div style="margin-top:6px">📷 Pas encore de QR code : c'est normal tant que les étapes 1 et 2 ne sont pas faites.</div>`;
-    return;
-  }
-  box.innerHTML = `<div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center">
-      <img src="/api/qr?${Date.now()}" alt="QR code" style="width:170px;height:170px;background:#fff;border-radius:12px;padding:6px">
+  const d = await api("/api/device_url");
+  let wifi;
+  if (d.lan_url) {
+    wifi = `<div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center">
+      <img src="/api/qr?for=lan&${Date.now()}" alt="QR code Wi-Fi" style="width:170px;height:170px;background:#fff;border-radius:12px;padding:6px">
       <div style="flex:1;min-width:200px;color:var(--text)">
-        <b>Sur ton iPhone ou ton iPad</b> (Tailscale allumé) :<br>1. ouvre l'<b>Appareil photo</b> et vise ce QR code → touche le lien ;<br>
-        2. dans Safari : <b>Partager</b> → <b>Sur l'écran d'accueil</b> → Ajouter ;<br>3. ouvre <b>Fusée</b> depuis l'icône → ⚙️ Réglages → active les notifications.
-        <div class="muted" style="margin-top:6px">Adresse privée : <code>${esc(url)}</code> — seuls tes appareils Tailscale peuvent l'ouvrir.</div></div></div>`;
+        <b>Sur ton iPhone ou ton iPad</b>, connecté au <b>même Wi-Fi</b> que le Mac :<br>
+        1. ouvre l'<b>Appareil photo</b> et vise ce QR code → touche le lien jaune ;<br>
+        2. Safari demande le <b>mot de passe</b> : écris celui que tu as choisi (nom d'utilisateur : ce que tu veux) ;<br>
+        3. touche <b>Partager</b> (carré avec une flèche) → <b>Sur l'écran d'accueil</b> → Ajouter.<br>
+        <span style="color:var(--accent)"><b>C'est fini : l'icône 🚀 Fusée est sur ton écran d'accueil.</b></span>
+        <div class="muted" style="margin-top:6px">Adresse : <code>${esc(d.lan_url)}</code><br>
+        Marche seulement à la maison, sur ce Wi-Fi, quand le Mac est allumé. Si un jour l'icône n'ouvre plus rien,
+        rescanne ce QR code (la box a pu changer l'adresse du Mac).</div>
+        ${d.on_mac ? `<a href="#" style="font-size:13px" onclick="wifiOff();return false">Fermer Fusée au Wi-Fi</a>` : ""}</div></div>`;
+  } else if (d.wifi_on || d.wifi_saved) {
+    wifi = `⏳ Fusée est en train de s'ouvrir au Wi-Fi… Si rien ne change, <b>redémarre Fusée</b> (🚀 Démarrage → Redémarrer) ou vérifie que le Mac est bien sur le Wi-Fi.`;
+  } else if (!d.on_mac) {
+    wifi = `Fais ce réglage <b>sur le Mac</b> : ⚙️ Réglages → 📱 Fusée sur ton iPhone.`;
+  } else {
+    wifi = `<b>Rien à installer sur l'iPhone</b> : il suffit de Safari. Choisis un mot de passe (il sera demandé sur l'iPhone, pas sur ce Mac) :
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+        <input id="wifiPwd" type="password" placeholder="Mot de passe (6 caractères ou plus)" autocomplete="new-password" style="flex:1;min-width:200px">
+        <button class="primary" onclick="wifiOn(this)">📶 Ouvrir Fusée au Wi-Fi de la maison</button></div>
+      <div class="muted" style="margin-top:6px">Pas ton code parent. Fusée redémarre quelques secondes, puis le QR code apparaît ici.
+      Si le Mac demande « accepter les connexions entrantes ? », touche <b>Autoriser</b>.</div>`;
+  }
+  const ts = d.url
+    ? `<div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center">
+      <img src="/api/qr?${Date.now()}" alt="QR code" style="width:130px;height:130px;background:#fff;border-radius:12px;padding:6px">
+      <div style="flex:1;min-width:200px;color:var(--text)">Tailscale allumé sur l'iPhone : vise ce QR code → Safari → <b>Partager</b> → <b>Sur l'écran d'accueil</b>.
+      <div class="muted" style="margin-top:6px">Adresse privée : <code>${esc(d.url)}</code></div></div></div>`
+    : `Il faut installer l'app gratuite <b>Tailscale</b> sur le Mac, l'iPhone et l'iPad (même compte), puis double-cliquer sur
+      <b>« Activer iPhone et iPad »</b> dans le dossier Fusee. <span class="muted">Pas obligatoire : le Wi-Fi ci-dessus suffit à la maison.</span>
+      <div style="margin-top:8px"><img src="/api/qr?for=tailscale" alt="QR code Tailscale" style="width:110px;height:110px;background:#fff;border-radius:12px;padding:6px"></div>`;
+  box.innerHTML = `<div style="color:var(--text);margin-bottom:6px"><b>📶 À la maison — rien à installer</b></div>${wifi}
+    <details style="margin-top:14px"${d.url ? " open" : ""}><summary><b>🌍 Partout, même hors de la maison</b> <span class="muted">(avec l'app Tailscale, + notifications)</span></summary>
+    <div style="margin-top:8px">${ts}</div></details>`;
+}
+async function wifiOn(btn) {
+  const pwd = $("#wifiPwd").value.trim();
+  if (pwd.length < 6) { alert("Choisis un mot de passe d'au moins 6 caractères."); return; }
+  btn.disabled = true; btn.textContent = "⏳ Fusée redémarre…";
+  const r = await post("/api/wifi", {on: true, password: pwd});
+  if (!r.ok) { btn.disabled = false; btn.textContent = "📶 Ouvrir Fusée au Wi-Fi de la maison";
+    alert((await r.json().catch(() => ({}))).detail || "Impossible"); return; }
+  waitRestart(() => renderDeviceBox());
+}
+async function wifiOff() {
+  if (!confirm("Fermer Fusée au Wi-Fi ? L'iPhone et l'iPad ne pourront plus l'ouvrir à la maison.")) return;
+  await post("/api/wifi", {on: false});
+  waitRestart(() => renderDeviceBox());
+}
+function waitRestart(done) {
+  let n = 0;
+  const t = setInterval(async () => {
+    n++;
+    try { const r = await fetch("/api/device_url", {cache: "no-store"}); if (r.ok && n > 2) { clearInterval(t); done(); } }
+    catch (e) { /* Fusée redémarre encore */ }
+    if (n > 40) { clearInterval(t); done(); }
+  }, 1000);
 }
 async function renderPushBox() {
   const box = $("#pushBox"); if (!box) return;
